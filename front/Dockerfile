@@ -11,4 +11,4 @@ COPY . .
 EXPOSE 3000
 
 # Используем тихий запуск
-CMD ["npm", "run", "start:quiet"]
+CMD ["npm", "run", "dev"]
