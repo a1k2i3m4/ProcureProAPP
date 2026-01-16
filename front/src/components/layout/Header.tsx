@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className="sticky top-0 z-50 border-b border-white/20 shadow-sm"
+        <header className="fixed w-full top-0 z-50 border-b border-white/20 shadow-sm"
                 style={{
                     background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)'
                 }}>
