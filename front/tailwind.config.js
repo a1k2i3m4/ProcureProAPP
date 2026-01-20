@@ -25,7 +25,12 @@ module.exports = {
         green: {
           600: '#059669',
         }
-      }
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Merriweather', 'serif'],
+        mono: ['Fira Code', 'monospace'],
+      },
     },
   },
  plugins: []

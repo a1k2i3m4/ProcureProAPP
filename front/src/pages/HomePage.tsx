@@ -35,7 +35,7 @@ const HomePage = () => {
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-3xl text-gray-900 mb-2">Панель управления</h1>
-                    <p className="text-gray-600">Добро пожаловать, manager</p>
+                    <p className="text-gray-600 font-">Добро пожаловать, manager</p>
                 </div>
                 <button className="flex items-center gap-2 px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
                     <span>История</span>
@@ -48,7 +48,7 @@ const HomePage = () => {
                     <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="text-3xl text-gray-900 mb-1">{stat.value}</div>
+                                <div className="text-3xl text-gray-bold mb-1 ">{stat.value}</div>
                                 <div className="text-sm text-gray-600">{stat.label}</div>
                             </div>
                             <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center`}>
