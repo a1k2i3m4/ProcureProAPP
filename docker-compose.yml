@@ -1,24 +1,78 @@
-services:
-  frontend:
-    build: ./front
-    container_name: react-frontend
-    ports:
-      - "3000:5173"
-    volumes:
-      - ./front:/app
-      - /app/node_modules
-    stdin_open: true
-    tty: true
-    command: npm run dev -- --host
+version: '3.8'
 
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: procurepro-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: procurepro
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./back/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - procurepro_network
+
+  # Node.js Backend
   backend:
     build: ./back
-    container_name: node-backend
+    container_name: procurepro-backend
     ports:
-      - "5001:5000"
+      - "3001:3001"
     volumes:
       - ./back:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=procurepro
+      - PORT=3001
+      - JWT_SECRET=your_super_secret_jwt_key_change_this_in_production_12345!@#$%
+      - JWT_EXPIRE=7d
+      - JWT_REFRESH_SECRET=your_super_secret_refresh_key_change_this_67890!@#$%
+      - JWT_REFRESH_EXPIRE=30d
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: npm run dev
+    networks:
+      - procurepro_network
+
+  # React Frontend
+  frontend:
+    build: ./front
+    container_name: procurepro-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    stdin_open: true
+    tty: true
+    command: npm run dev -- --host
+    depends_on:
+      - backend
+    networks:
+      - procurepro_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  procurepro_network:
+    driver: bridge

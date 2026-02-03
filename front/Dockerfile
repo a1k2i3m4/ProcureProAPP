@@ -8,7 +8,6 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 5173
 
-# Используем тихий запуск
 CMD ["npm", "run", "dev"]

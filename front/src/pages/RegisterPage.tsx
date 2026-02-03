@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Lock, User, Mail, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from "../context/AuthContext.tsx";
-
-
+import { useNavigate } from 'react-router-dom';
 
 export function RegisterPage() {
     const { register, error: authError, loading } = useAuth();
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         username: '',
         email: '',
@@ -55,7 +55,9 @@ export function RegisterPage() {
                 confirmPassword: formData.confirmPassword,
             });
 
-            if (!result.success) {
+            if (result.success) {
+                navigate('/');
+            } else {
                 setLocalError(result.error?.message || 'Ошибка регистрации');
             }
         } else {
@@ -234,7 +236,7 @@ export function RegisterPage() {
                         <p className="text-sm text-gray-600">
                             Уже есть аккаунт?{' '}
                             <button
-                                onClick={()=> window.location.href = '/login'}
+                                onClick={() => navigate('/login')}
                                 disabled={loading}
                                 className="text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50"
                             >
