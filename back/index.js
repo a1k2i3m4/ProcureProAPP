@@ -20,6 +20,13 @@ async function initDb() {
   const sql = fs.readFileSync(schemaPath, 'utf8');
   await pool.query(sql);
 
+  // Orders schema
+  const ordersSchemaPath = path.join(__dirname, 'sql', 'orders_schema.sql');
+  if (fs.existsSync(ordersSchemaPath)) {
+    const ordersSql = fs.readFileSync(ordersSchemaPath, 'utf8');
+    await pool.query(ordersSql);
+  }
+
   await pool.query(
     'CREATE TABLE IF NOT EXISTS import_flags (key TEXT PRIMARY KEY, value TEXT, created_at TIMESTAMP DEFAULT NOW())'
   );
@@ -86,6 +93,13 @@ async function importOnce({ force = false } = {}) {
   return { skipped: false, rowsParsed: records.length };
 }
 
+// Orders folder resolution (server vs local)
+const ORDERS_DIR = process.env.ORDERS_DIR || (process.env.NODE_ENV === 'production' ? '/var/www/orders' : path.join(process.cwd(), 'orders'));
+
+// Register orders routes
+const ordersRoutes = require('./routes/ordersRoutes');
+app.use('/api', ordersRoutes);
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -110,6 +124,12 @@ app.post('/api/import/cu', async (req, res) => {
   }
 });
 
+// Start watcher after server starts
+function startOrdersWatcher() {
+  const watcher = require('./services/ordersWatcher');
+  watcher.watchOrdersFolder(ORDERS_DIR, pool);
+}
+
 (async () => {
   try {
     await initDb();
@@ -117,6 +137,8 @@ app.post('/api/import/cu', async (req, res) => {
     await importOnce({ force: false });
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Backend listening on http://0.0.0.0:${PORT}`);
+      console.log(`📂 Orders directory: ${ORDERS_DIR}`);
+      startOrdersWatcher();
     });
   } catch (e) {
     console.error('❌ Startup error:', e);
