@@ -4,18 +4,19 @@ import Header from './Header';
 
 interface LayoutProps {
     children: React.ReactNode;
+    showHeader?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({children}) =>{
-    return(
+const Layout: React.FC<LayoutProps> = ({ children, showHeader = true }) => {
+    return (
         <div className="layout">
-            <Header />
+            {showHeader ? <Header /> : null}
             <main className="main pt-14">
                 {children}
             </main>
             {/*<Footer />*/}
         </div>
-    )
+    );
 }
 
 export default Layout;

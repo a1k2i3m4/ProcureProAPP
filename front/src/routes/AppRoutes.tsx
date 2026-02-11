@@ -10,6 +10,7 @@ import { PublicRoute } from "../components/route/PublicRoute";
 
 // Ленивая загрузка страниц
 const HomePage = lazy(() => import('../pages/HomePage'));
+const SuppliersPage = lazy(() => import('../pages/SuppliersPage'));
 
 const AppRoutes: React.FC = () => {
     return (
@@ -23,6 +24,13 @@ const AppRoutes: React.FC = () => {
                                 <HomePage />
                             </Layout>
                         </ProtectedRoute>
+                    } />
+
+                    {/* Suppliers page (public) */}
+                    <Route path="/suppliers" element={
+                        <Layout>
+                            <SuppliersPage />
+                        </Layout>
                     } />
 
                     {/* Public Routes */}
