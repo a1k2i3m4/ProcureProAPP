@@ -122,26 +122,26 @@ export interface AnalysisError {
 
 export const ordersApi = {
     getOrders: async () => {
-        const response = await publicApi.get<Order[]>('/api/orders');
+        const response = await publicApi.get<Order[]>('/orders');
         return response.data;
     },
     getOrdersToday: async () => {
-        const response = await publicApi.get<Order[]>('/api/orders/today');
+        const response = await publicApi.get<Order[]>('/orders/today');
         return response.data;
     },
     getOrderDetails: async (id: string) => {
-        const response = await publicApi.get<Order>(`/api/orders/${id}`);
+        const response = await publicApi.get<Order>(`/orders/${id}`);
         return response.data;
     },
     getStats: async () => {
-        const response = await publicApi.get<Stats>('/api/stats');
+        const response = await publicApi.get<Stats>('/stats');
         return response.data;
     },
 
     // Analysis methods
     analyzeOrder: async (orderId: string) => {
         try {
-            const response = await publicApi.post(`/api/orders/${orderId}/analyze`);
+            const response = await publicApi.post(`/orders/${orderId}/analyze`);
             return response.data;
         } catch (error: unknown) {
             console.error('Error in analyzeOrder:', error);
@@ -154,39 +154,39 @@ export const ordersApi = {
     },
 
     getAnalysisStatus: async (orderId: string) => {
-        const response = await publicApi.get<AnalysisStatus>(`/api/orders/${orderId}/analysis-status`);
+        const response = await publicApi.get<AnalysisStatus>(`/orders/${orderId}/analysis-status`);
         return response.data;
     },
 
     completeAnalysis: async (orderId: string) => {
-        const response = await publicApi.post(`/api/orders/${orderId}/complete-analysis`);
+        const response = await publicApi.post(`/orders/${orderId}/complete-analysis`);
         return response.data;
     },
 
     restartAnalysis: async (orderId: string) => {
-        const response = await publicApi.post(`/api/orders/${orderId}/restart-analysis`);
+        const response = await publicApi.post(`/orders/${orderId}/restart-analysis`);
         return response.data;
     },
 
     getSupplierResponses: async (orderId: string) => {
-        const response = await publicApi.get<SupplierResponse[]>(`/api/orders/${orderId}/responses`);
+        const response = await publicApi.get<SupplierResponse[]>(`/orders/${orderId}/responses`);
         return response.data;
     },
 
     getBestOffers: async (orderId: string, limit = 10) => {
-        const response = await publicApi.get<BestOffer[]>(`/api/orders/${orderId}/best-offers`, {
+        const response = await publicApi.get<BestOffer[]>(`/orders/${orderId}/best-offers`, {
             params: { limit }
         });
         return response.data;
     },
 
     getOptimalCombination: async (orderId: string) => {
-        const response = await publicApi.get<OptimalCombination>(`/api/orders/${orderId}/optimal-combination`);
+        const response = await publicApi.get<OptimalCombination>(`/orders/${orderId}/optimal-combination`);
         return response.data;
     },
 
     getAnalysisErrors: async (orderId: string) => {
-        const response = await publicApi.get<AnalysisError[]>(`/api/orders/${orderId}/errors`);
+        const response = await publicApi.get<AnalysisError[]>(`/orders/${orderId}/errors`);
         return response.data;
     }
 };

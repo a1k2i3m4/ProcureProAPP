@@ -74,7 +74,7 @@ const api = createApiInstance();
 export const authApi = {
     login: async (credentials: AuthCredentials): Promise<AuthResponse> => {
         try{
-            const response = await api.post<ApiResponse<AuthResponse>>('auth/login', credentials);
+            const response = await api.post<ApiResponse<AuthResponse>>('/auth/login', credentials);
             return response.data.data;
         }catch(error){
             const axiosError = error as AxiosError<{message: string}>;
@@ -84,7 +84,7 @@ export const authApi = {
 
     register: async (userData: RegisterData): Promise<AuthResponse> => {
         try {
-            const response = await api.post<ApiResponse<AuthResponse>>('auth/register', userData);
+            const response = await api.post<ApiResponse<AuthResponse>>('/auth/register', userData);
             return response.data.data;
         }catch(error){
             const axiosError = error as AxiosError<{message: string}>;
@@ -95,7 +95,7 @@ export const authApi = {
     logout: async (): Promise<void> => {
         try {
             const refreshToken = localStorage.getItem('refreshToken');
-            await api.post('auth/logout', {refreshToken});
+            await api.post('/auth/logout', {refreshToken});
         }catch(error){
             console.error('Logout error:', error);
         }finally {
@@ -106,7 +106,7 @@ export const authApi = {
 
     getProfile: async (): Promise<User> => {
         try{
-            const response = await api.get<ApiResponse<User>>('auth/Profile');
+            const response = await api.get<ApiResponse<User>>('/auth/Profile');
             return response.data.data;
         }catch (error){
             const axiosError = error as AxiosError<{message: string}>;
