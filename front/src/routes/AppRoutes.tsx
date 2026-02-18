@@ -14,6 +14,9 @@ import { PublicRoute } from "../components/route/PublicRoute";
 // ========================================
 const HomePage = lazy(() => import('../pages/HomePage'));
 const SuppliersPage = lazy(() => import('../pages/SuppliersPage'));
+const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'));
+const SupplierFormPage = lazy(() => import('../pages/SupplierFormPage'));
+const AnalysisDetailsPage = lazy(() => import('../pages/AnalysisDetailsPage'));
 
 /**
  * 🔀 AppRoutes - Основная маршрутизация приложения
@@ -91,8 +94,54 @@ const AppRoutes: React.FC = () => {
                             <Layout>
                                 <NotFoundPage />
                             </Layout>
-                        }
-                    />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Suppliers page (public) */}
+                    <Route path="/suppliers" element={
+                        <Layout>
+                            <SuppliersPage />
+                        </Layout>
+                    } />
+
+                    {/* Analytics page */}
+                    <Route path="/analytics" element={
+                        <Layout>
+                            <AnalyticsPage />
+                        </Layout>
+                    } />
+
+                    {/* Analytics details page */}
+                    <Route path="/analytics/:id" element={
+                        <Layout>
+                            <AnalysisDetailsPage />
+                        </Layout>
+                    } />
+
+                    {/* Supplier Form - Public page without Layout */}
+                    <Route path="/supplier-form/:orderId/:supplierId" element={
+                        <SupplierFormPage />
+                    } />
+
+                    {/* Public Routes */}
+                    <Route path="/login" element={
+                        <PublicRoute>
+                            <LoginPage  />
+                        </PublicRoute>
+                    } />
+
+                    <Route path="/register" element={
+                        <PublicRoute>
+                            <RegisterPage />
+                        </PublicRoute>
+                    } />
+
+                    {/* Catch-all route */}
+                    <Route path="*" element={
+                        <Layout>
+                            <NotFoundPage />
+                        </Layout>
+                    } />
                 </Routes>
             </Suspense>
         </BrowserRouter>

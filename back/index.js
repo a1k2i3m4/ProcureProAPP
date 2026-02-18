@@ -1,86 +1,392 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const pool = require('./config/database');
-const authRoutes = require('./routes/authRoutes');
+const fs = require('fs');
+const path = require('path');
+
+const pool = require('./db');
+const suppliersRoutes = require('./routes/suppliersRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const supplierFormRoutes = require('./routes/supplierFormRoutes');
+const oneCRoutes = require('./routes/oneCRoutes');
+const { parseSuppliersFromCU } = require('./services/excelImport');
+const whatsappService = require('./services/whatsappService');
+const orderAnalyzer = require('./services/orderAnalyzer');
+const { CATEGORY_MAPPING } = require('./services/categoryMapper');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT || 5000);
 
-// Middleware
-app.use(cors());
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'] }));
 app.use(express.json());
 
-// Инициализация БД - создание таблиц при старте
-async function initializeDatabase() {
-    try {
-        // Читаем SQL команды
-        const fs = require('fs').promises;
-        const path = require('path');
-        const initSQL = await fs.readFile(path.join(__dirname, './database/init.sql'), 'utf-8');
+async function initDb() {
+  const schemaPath = path.join(__dirname, 'sql', 'schema.sql');
+  const sql = fs.readFileSync(schemaPath, 'utf8');
+  await pool.query(sql);
 
-        // Выполняем каждую команду
-        const commands = initSQL.split(';').filter(cmd => cmd.trim());
-        for (const command of commands) {
-            await pool.query(command);
-        }
-        console.log('✅ База данных инициализирована');
-    } catch (error) {
-        console.error('❌ Ошибка инициализации БД:', error.message);
-    }
+  // Orders schema
+  const ordersSchemaPath = path.join(__dirname, 'sql', 'orders_schema.sql');
+  if (fs.existsSync(ordersSchemaPath)) {
+    const ordersSql = fs.readFileSync(ordersSchemaPath, 'utf8');
+    await pool.query(ordersSql);
+  }
+
+  // Analysis schema (WhatsApp integration)
+  const analysisSchemaPath = path.join(__dirname, 'sql', 'analysis_schema.sql');
+  if (fs.existsSync(analysisSchemaPath)) {
+    const analysisSql = fs.readFileSync(analysisSchemaPath, 'utf8');
+    await pool.query(analysisSql);
+  }
+
+  // Extended analytics schema
+  const analyticsExtendedSchemaPath = path.join(__dirname, 'sql', 'analytics_extended_schema.sql');
+  if (fs.existsSync(analyticsExtendedSchemaPath)) {
+    const analyticsExtendedSql = fs.readFileSync(analyticsExtendedSchemaPath, 'utf8');
+    await pool.query(analyticsExtendedSql);
+  }
+
+  await pool.query(
+    'CREATE TABLE IF NOT EXISTS import_flags (key TEXT PRIMARY KEY, value TEXT, created_at TIMESTAMP DEFAULT NOW())'
+  );
 }
 
-// Проверка подключения к БД
-async function checkDatabaseConnection() {
-    try {
-        const result = await pool.query('SELECT NOW()');
-        console.log('✅ Подключение к БД успешно');
-        return true;
-    } catch (error) {
-        console.error('❌ Ошибка подключения к БД:', error.message);
-        console.log('⚠️  Убедитесь, что PostgreSQL запущена и данные в .env верные');
-        return false;
-    }
+async function importOnce({ force = false } = {}) {
+  if (force) {
+    await pool.query("DELETE FROM import_flags WHERE key = 'cu_suppliers_imported'");
+  } else {
+    const imported = await pool.query('SELECT value FROM import_flags WHERE key = $1', ['cu_suppliers_imported']);
+    if (imported.rows.length) return { skipped: true, rowsParsed: 0 };
+  }
+
+  const uploadsDir = path.join(__dirname, 'uploads');
+  const candidates = [
+    path.join(uploadsDir, 'Список поставщиков_CU.xlsx'),
+    path.join(uploadsDir, 'Список поставщиков CU.xlsx'),
+    path.join(uploadsDir, 'Список поставщиков_CU.XLSX'),
+  ];
+
+  let excelPath = candidates.find((p) => fs.existsSync(p));
+
+  if (!excelPath && fs.existsSync(uploadsDir)) {
+    const xlsxFile = fs.readdirSync(uploadsDir).find((f) => f.toLowerCase().endsWith('.xlsx'));
+    if (xlsxFile) excelPath = path.join(uploadsDir, xlsxFile);
+  }
+
+  if (!excelPath) {
+    throw new Error(`Excel файл не найден в ${uploadsDir}. Положите файл Список поставщиков_CU.xlsx`);
+  }
+
+  console.log('📥 Importing suppliers from:', excelPath);
+  const records = parseSuppliersFromCU(excelPath);
+  console.log('📄 Parsed rows:', records.length);
+
+  if (force) {
+    // при форсе чистим, чтобы гарантировать "один раз перезаписать"
+    await pool.query('TRUNCATE TABLE suppliers RESTART IDENTITY CASCADE');
+    await pool.query('TRUNCATE TABLE categories RESTART IDENTITY CASCADE');
+  }
+
+  for (const r of records) {
+    const cat = await pool.query(
+      'INSERT INTO categories(name) VALUES($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
+      [r.category]
+    );
+    const categoryId = cat.rows[0].id;
+
+    const phoneDigits = normalizeDigitsPhone(r.phone || '');
+    const whatsappDigits = phoneDigits || null;
+
+    await pool.query(
+      `INSERT INTO suppliers(name, contact_person, phone, whatsapp, category_id)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT (name, phone, category_id) DO UPDATE SET
+         contact_person = EXCLUDED.contact_person,
+         whatsapp = COALESCE(NULLIF(EXCLUDED.whatsapp, ''), suppliers.whatsapp),
+         updated_at = NOW()`,
+      [r.supplier, r.contactPerson || null, r.phone || null, whatsappDigits, categoryId]
+    );
+  }
+
+  await pool.query(
+    'INSERT INTO import_flags(key, value) VALUES($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+    ['cu_suppliers_imported', new Date().toISOString()]
+  );
+
+  return { skipped: false, rowsParsed: records.length };
 }
 
-// Маршруты
-app.use('/auth', authRoutes);
+// Orders folder resolution (server vs local)
+// Priority:
+// 1) ORDERS_DIR env (e.g. "/orders" inside docker)
+// 2) ORDERS_DIR_HOST_PATH env (e.g. "/home/ubuntu/testServer/data" on VPS when running without docker)
+// 3) default: ./orders (dev)
+const ORDERS_DIR =
+  process.env.ORDERS_DIR ||
+  process.env.ORDERS_DIR_HOST_PATH ||
+  (process.env.NODE_ENV === 'production'
+    ? '/home/ubuntu/testServer/data'
+    : path.join(process.cwd(), 'orders'));
 
-app.get('/', (req, res) => {
+function safeCountJsonFiles(dirPath) {
+  try {
+    const list = fs.readdirSync(dirPath);
+    return list.filter((f) => f.toLowerCase().endsWith('.json')).length;
+  } catch {
+    return null;
+  }
+}
+
+// Debug: watcher status
+app.get('/api/debug/orders-watcher', (_req, res) => {
+  const processedDir = path.join(ORDERS_DIR, 'processed');
+  const errorsDir = path.join(ORDERS_DIR, 'errors');
+
+  res.json({
+    ok: true,
+    orders_dir: ORDERS_DIR,
+    exists: fs.existsSync(ORDERS_DIR),
+    processed_dir: processedDir,
+    errors_dir: errorsDir,
+    processed_json_count: safeCountJsonFiles(processedDir),
+    errors_json_count: safeCountJsonFiles(errorsDir)
+  });
+});
+
+// Register orders routes
+const ordersRoutes = require('./routes/ordersRoutes');
+app.use('/api', ordersRoutes);
+
+// 1C integration routes
+app.use('/api', oneCRoutes);
+
+// Register supplier form routes (public)
+app.use('/api', supplierFormRoutes);
+
+
+// Setup WhatsApp webhook
+whatsappService.setupWebhook(app, async (from, text, timestamp) => {
+  console.log(`📩 Received WhatsApp message from ${from}`);
+
+  try {
+    // Find supplier by WhatsApp number
+    const supplierResult = await pool.query(
+      `SELECT id, name FROM suppliers WHERE whatsapp = $1`,
+      [from]
+    );
+
+    if (supplierResult.rows.length === 0) {
+      console.log(`⚠️ Unknown supplier WhatsApp: ${from}`);
+      return;
+    }
+
+    const supplier = supplierResult.rows[0];
+
+    // Find active analysis for this supplier
+    const analysisResult = await pool.query(
+      `SELECT DISTINCT oa.order_id 
+       FROM order_analysis oa
+       WHERE oa.status = 'in_progress'
+       AND EXISTS (
+         SELECT 1 FROM suppliers s
+         JOIN categories c ON c.id = s.category_id
+         WHERE s.id = $1
+       )
+       ORDER BY oa.started_at DESC
+       LIMIT 1`,
+      [supplier.id]
+    );
+
+    if (analysisResult.rows.length === 0) {
+      console.log(`⚠️ No active analysis found for supplier ${supplier.name}`);
+      return;
+    }
+
+    const orderId = analysisResult.rows[0].order_id;
+
+    // Process the response
+    await orderAnalyzer.processResponse(pool, orderId, supplier.id, text);
+
+  } catch (error) {
+    console.error('Error processing WhatsApp message:', error);
+  }
+});
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
+app.use('/api', suppliersRoutes);
+app.use('/api', analyticsRoutes);
+
+app.post('/api/import/cu', async (req, res) => {
+  try {
+    const force = String(req.query.force || '').toLowerCase() === '1' || String(req.query.force || '').toLowerCase() === 'true';
+    const result = await importOnce({ force });
+    const counts = await pool.query(
+      'SELECT (SELECT COUNT(*)::int FROM categories) AS categories, (SELECT COUNT(*)::int FROM suppliers) AS suppliers'
+    );
+    res.json({ ok: true, imported: !result.skipped, rowsParsed: result.rowsParsed, counts: counts.rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
+// POST /api/init-test-suppliers - Initialize test suppliers with WhatsApp numbers
+app.post('/api/init-test-suppliers', async (req, res) => {
+  try {
+    console.log('🔄 Initializing test suppliers...');
+
+    // Add categories
+    const categories = [
+      'Электроника',
+      'Канцтовары',
+      'Мебель',
+      'Строительные материалы',
+      'Хозяйственные товары'
+    ];
+
+    for (const cat of categories) {
+      await pool.query(
+        'INSERT INTO categories(name) VALUES($1) ON CONFLICT (name) DO NOTHING',
+        [cat]
+      );
+    }
+
+    // Add test suppliers
+    const suppliers = [
+      {
+        name: 'ТехноПлюс',
+        contact: 'Иван Петров',
+        phone: '+77011234567',
+        whatsapp: '77011234567',
+        category: 'Электроника',
+        rating: 4.8,
+        urgent: true
+      },
+      {
+        name: 'СуперКанц',
+        contact: 'Мария Иванова',
+        phone: '+77012345678',
+        whatsapp: '77012345678',
+        category: 'Канцтовары',
+        rating: 4.5,
+        urgent: true
+      },
+      {
+        name: 'МебельЦентр',
+        contact: 'Петр Сидоров',
+        phone: '+77013456789',
+        whatsapp: '77013456789',
+        category: 'Мебель',
+        rating: 4.2,
+        urgent: false
+      },
+      {
+        name: 'СтройМастер',
+        contact: 'Ольга Козлова',
+        phone: '+77014567890',
+        whatsapp: '77014567890',
+        category: 'Строительные материалы',
+        rating: 4.6,
+        urgent: true
+      },
+      {
+        name: 'ХозТовары Плюс',
+        contact: 'Дмитрий Смирнов',
+        phone: '+77015678901',
+        whatsapp: '77015678901',
+        category: 'Хозяйственные товары',
+        rating: 4.3,
+        urgent: false
+      }
+    ];
+
+    let added = 0;
+    for (const s of suppliers) {
+      const catResult = await pool.query(
+        'SELECT id FROM categories WHERE name = $1',
+        [s.category]
+      );
+
+      if (catResult.rows.length > 0) {
+        await pool.query(
+          `INSERT INTO suppliers (name, contact_person, phone, whatsapp, category_id, rating, can_urgent)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (name, phone, category_id) DO UPDATE SET
+             whatsapp = EXCLUDED.whatsapp,
+             rating = EXCLUDED.rating,
+             can_urgent = EXCLUDED.can_urgent`,
+          [s.name, s.contact, s.phone, s.whatsapp, catResult.rows[0].id, s.rating, s.urgent]
+        );
+        added++;
+      }
+    }
+
+    // Get count
+    const count = await pool.query(
+      'SELECT COUNT(*)::int as count FROM suppliers WHERE whatsapp IS NOT NULL AND whatsapp != \'\'',
+      []
+    );
+
+    console.log(`✅ Test suppliers initialized: ${added} suppliers added/updated`);
     res.json({
-        message: 'Backend запущен!',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV
+      ok: true,
+      message: 'Test suppliers initialized successfully',
+      suppliers_added: added,
+      total_with_whatsapp: count.rows[0].count
     });
+  } catch (e) {
+    console.error('❌ Error initializing test suppliers:', e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', service: 'backend' });
-});
-
-// Обработка ошибок
-app.use((err, req, res, next) => {
-    console.error(err);
-    res.status(500).json({
-        message: 'Ошибка сервера',
-        error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-});
-
-// Запуск сервера
-async function startServer() {
-    const isConnected = await checkDatabaseConnection();
-
-    if (isConnected) {
-        await initializeDatabase();
-    }
-
-    app.listen(PORT, () => {
-        console.log(`🚀 Backend сервер запущен на порту ${PORT}`);
-        console.log(`📱 API URL: http://localhost:${PORT}`);
-        console.log(`🔐 JWT Secret: ${process.env.JWT_SECRET ? '✓ установлен' : '✗ не установлен'}`);
-    });
+// Start watcher after server starts
+function startOrdersWatcher() {
+  const watcher = require('./services/ordersWatcher');
+  watcher.watchOrdersFolder(ORDERS_DIR, pool);
 }
 
-startServer();
+function normalizeDigitsPhone(raw) {
+  return String(raw || '').replace(/[^\d]/g, '').trim();
+}
 
+async function ensureMappedCategoriesExist() {
+  // Ensure categories used by category mapper exist in DB
+  try {
+    const mappedCategoryNames = new Set();
+    for (const arr of Object.values(CATEGORY_MAPPING || {})) {
+      if (Array.isArray(arr)) arr.forEach((n) => n && mappedCategoryNames.add(String(n)));
+    }
+
+    for (const name of mappedCategoryNames) {
+      await pool.query('INSERT INTO categories(name) VALUES($1) ON CONFLICT (name) DO NOTHING', [name]);
+    }
+  } catch (e) {
+    console.warn('⚠️ ensureMappedCategoriesExist failed:', String(e.message || e));
+  }
+}
+
+(async () => {
+  try {
+    await initDb();
+    await ensureMappedCategoriesExist();
+    // при старте делаем авто-импорт только если еще не импортировали
+    await importOnce({ force: false });
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Backend listening on http://0.0.0.0:${PORT}`);
+      console.log(`📂 Orders directory: ${ORDERS_DIR}`);
+      startOrdersWatcher();
+    });
+  } catch (e) {
+    console.error('❌ Startup error:', e);
+    process.exit(1);
+  }
+})();

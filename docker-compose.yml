@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:14-alpine
     container_name: procurepro-postgres
@@ -13,66 +12,52 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./back/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
-    networks:
-      - procurepro_network
+      retries: 10
 
   # Node.js Backend
   backend:
     build: ./back
-    container_name: procurepro-backend
+    container_name: node-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "5001:5000"
     volumes:
       - ./back:/app
+      - ./back/uploads:/app/uploads:ro
       - /app/node_modules
+      - ${ORDERS_DIR_HOST:-./back/orders}:/orders
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
+      - PORT=5000
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=procurepro
-      - PORT=5000
-      - JWT_SECRET=your_super_secret_jwt_key_change_this_in_production_12345!@#$%
-      - JWT_EXPIRE=7d
-      - JWT_REFRESH_SECRET=your_super_secret_refresh_key_change_this_67890!@#$%
-      - JWT_REFRESH_EXPIRE=30d
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - ORDERS_DIR=/orders
     command: npm run dev
-    networks:
-      - procurepro_network
 
-  # React Frontend
   frontend:
     build: ./front
-    container_name: procurepro-frontend
+    container_name: react-frontend
+    depends_on:
+      - backend
     ports:
-      - "3000:5173"
+      - "5174:5173"
     volumes:
       - ./front:/app
       - /app/node_modules
-    environment:
-      - VITE_API_URL=http://localhost:5001
     stdin_open: true
     tty: true
     command: npm run dev -- --host
-    depends_on:
-      - backend
-    networks:
-      - procurepro_network
 
 volumes:
   postgres_data:
-    driver: local
-
-networks:
-  procurepro_network:
-    driver: bridge
