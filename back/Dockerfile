@@ -4,10 +4,13 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+# ставим только prod-зависимости
+RUN npm ci --omit=dev
 
 COPY . .
 
+ENV NODE_ENV=production
+
 EXPOSE 5000
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]

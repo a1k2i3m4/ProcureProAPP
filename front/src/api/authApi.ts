@@ -2,9 +2,10 @@
 import axios, {AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig} from 'axios'
 import {AuthCredentials, AuthResponse, RegisterData, User} from "../types/auth.ts";
 
-const API_URL = (import.meta.env.VITE_API_URL as string) ?? 'http://localhost:3000';
+// В проде лучше использовать относительный baseURL (Nginx проксирует /api на backend)
+const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 
-interface ApiResponse <T = any> {
+interface ApiResponse <T = unknown> {
     data: T;
     message?: string;
     status: number;
