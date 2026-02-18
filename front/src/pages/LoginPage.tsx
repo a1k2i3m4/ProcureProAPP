@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from "../context/AuthContext.tsx";
+import { useNavigate } from 'react-router-dom';
 
 export function LoginPage() {
-    const { login, error: authError,loading } = useAuth();
+    const { login, error: authError, loading } = useAuth();
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -19,7 +21,9 @@ export function LoginPage() {
         }
 
         const result = await login({ email, password });
-        if (!result.success) {
+        if (result.success) {
+            navigate('/');
+        } else {
             setLocalError(result.error?.message || 'Ошибка входа');
         }
     };
@@ -147,7 +151,7 @@ export function LoginPage() {
                         <p className="text-sm text-gray-600">
                             Нет аккаунта?{' '}
                             <button
-                                onClick={() => window.location.href = '/register'}
+                                onClick={() => navigate('/register')}
                                 disabled={loading}
                                 className="text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50"
                             >

@@ -35,18 +35,21 @@ const HomePage = () => {
             value: stats?.total_orders.toString() || '-',
             label: 'Заказы из 1С',
             color: 'bg-purple-100 text-purple-600',
+            trend: { value: 12, direction: 'up' as const },
         },
         {
             icon: Users,
             value: suppliersCount.toString(),
             label: 'Поставщики',
             color: 'bg-blue-100 text-blue-600',
+            trend: { value: 5, direction: 'up' as const },
         },
         {
             icon: Package,
             value: stats?.total_items.toString() || '-',
             label: 'Всего товаров',
             color: 'bg-orange-100 text-orange-600',
+            trend: { value: 3, direction: 'down' as const },
         },
         {
             icon: Clock,
@@ -55,6 +58,11 @@ const HomePage = () => {
             color: 'bg-green-100 text-green-600',
         },
     ];
+
+    const handleStatClick = (statLabel: string) => {
+        console.log(`Clicked on: ${statLabel}`);
+        // Можно добавить навигацию или модальное окно с деталями
+    };
 
     return (
         <div className="container mx-auto px-6 py-8">
