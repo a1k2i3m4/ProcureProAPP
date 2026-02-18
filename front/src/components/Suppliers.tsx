@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { SupplierCard, type PriceLevel } from './SupplierCard';
 import { TrendingUp, Users, Award } from 'lucide-react';
 
 interface Supplier {
@@ -10,7 +9,7 @@ interface Supplier {
     ordersCount: number;
     reliability: number;
     categories: string[];
-    priceLevel: PriceLevel;
+    priceLevel: 'low' | 'medium' | 'high';
     avgResponseTime: string;
 }
 
@@ -65,10 +64,6 @@ export function Suppliers() {
         selectedStatus === 'all' || supplier.status === selectedStatus
     );
 
-    const handleSelectSupplier = (supplierId: string) => {
-        console.log(`Selected supplier: ${supplierId}`);
-    };
-
     const regularCount = mockSuppliers.filter(s => s.status === 'regular').length;
     const newCount = mockSuppliers.filter(s => s.status === 'new').length;
     const avgRating = (mockSuppliers.reduce((sum, s) => sum + s.rating, 0) / mockSuppliers.length).toFixed(1);
@@ -109,7 +104,7 @@ export function Suppliers() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-purple-100 text-sm font-medium">Средний рейтинг</p>
-                                    <p className="text-3xl font-bold mt-1">{avgRating} ⭐</p>
+                                    <p className="text-3xl font-bold mt-1">{avgRating} ⭑</p>
                                 </div>
                                 <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                                     <Award className="w-6 h-6" />
@@ -199,11 +194,11 @@ export function Suppliers() {
                         {/* Cards Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {filteredSuppliers.map((supplier) => (
-                                <div key={supplier.id} className="transform hover:scale-105 transition-transform duration-300">
-                                    <SupplierCard
-                                        {...supplier}
-                                        onSelect={() => handleSelectSupplier(supplier.id)}
-                                    />
+                                <div key={supplier.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                                    <div className="font-bold text-gray-900 truncate" title={supplier.name}>{supplier.name}</div>
+                                    <div className="text-sm text-gray-600 mt-1">Рейтинг: {supplier.rating} · Надёжность: {supplier.reliability}%</div>
+                                    <div className="text-sm text-gray-600 mt-1">Категории: {supplier.categories.join(', ')}</div>
+                                    <div className="text-sm text-gray-600 mt-1">Срок ответа: {supplier.avgResponseTime}</div>
                                 </div>
                             ))}
                         </div>
@@ -213,12 +208,8 @@ export function Suppliers() {
                         <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                             <span className="text-5xl">🔍</span>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                            Поставщиков не найдено
-                        </h3>
-                        <p className="text-gray-500 text-center max-w-md">
-                            Попробуйте выбрать другой фильтр или проверьте фильтры поставки
-                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Поставщиков не найдено</h3>
+                        <p className="text-gray-500 text-center max-w-md">Попробуйте выбрать другой фильтр</p>
                         <button
                             onClick={() => setSelectedStatus('all')}
                             className="mt-6 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"

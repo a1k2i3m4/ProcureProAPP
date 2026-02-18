@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Package, Send, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
+type ApiErrorBody = { message?: string };
+function getApiErrorMessage(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const maybe = data as ApiErrorBody;
+  return typeof maybe.message === 'string' ? maybe.message : null;
+}
 
 interface OrderItem {
   tovar: string;
@@ -62,9 +69,9 @@ const SupplierFormPage: React.FC = () => {
   const [orderData, setOrderData] = useState<FormData | null>(null);
   const [supplierData, setSupplierData] = useState<SupplierData | null>(null);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
-  const [existingResponses, setExistingResponses] = useState<ExistingResponse[]>([]);
 
   const [contactName, setContactName] = useState('');
+
   const [itemResponses, setItemResponses] = useState<ItemResponse[]>([]);
   const [alternativeOffer, setAlternativeOffer] = useState<AlternativeOffer>({
     item_name: '',
@@ -74,11 +81,7 @@ const SupplierFormPage: React.FC = () => {
   });
   const [showAlternative, setShowAlternative] = useState(false);
 
-  useEffect(() => {
-    fetchFormData();
-  }, [orderId, supplierId]);
-
-  const fetchFormData = async () => {
+  const fetchFormData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -89,7 +92,6 @@ const SupplierFormPage: React.FC = () => {
         setOrderData(response.data.order);
         setSupplierData(response.data.supplier);
         setAnalysisData(response.data.analysis);
-        setExistingResponses(response.data.existing_responses || []);
 
         // Initialize item responses from order items
         if (response.data.order.items) {
@@ -116,13 +118,22 @@ const SupplierFormPage: React.FC = () => {
       } else {
         setError(response.data.message || 'Ошибка загрузки данных');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching form data:', err);
-      setError(err.response?.data?.message || 'Не удалось загрузить данные формы');
+      if (axios.isAxiosError(err)) {
+        const msg = getApiErrorMessage(err.response?.data);
+        setError(msg || 'Не удалось загрузить данные формы');
+      } else {
+        setError('Не удалось загрузить данные формы');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, supplierId]);
+
+  useEffect(() => {
+    fetchFormData();
+  }, [fetchFormData]);
 
   const handleItemChange = (index: number, field: keyof ItemResponse, value: string | number) => {
     const updated = [...itemResponses];
@@ -184,7 +195,11 @@ const SupplierFormPage: React.FC = () => {
         item => item.price > 0 && item.quantity > 0
       );
 
-      const payload: any = {
+      const payload: {
+        contact_name: string;
+        items: ItemResponse[];
+        alternative_offer?: AlternativeOffer;
+      } = {
         contact_name: contactName,
         items: validItems
       };
@@ -203,9 +218,14 @@ const SupplierFormPage: React.FC = () => {
       } else {
         setError(response.data.message || 'Ошибка отправки формы');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting form:', err);
-      setError(err.response?.data?.message || 'Не удалось отправить форму');
+      if (axios.isAxiosError(err)) {
+        const msg = getApiErrorMessage(err.response?.data);
+        setError(msg || 'Не удалось отправить форму');
+      } else {
+        setError('Не удалось отправить форму');
+      }
     } finally {
       setSubmitting(false);
     }

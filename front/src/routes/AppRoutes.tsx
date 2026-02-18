@@ -8,15 +8,12 @@ import { RegisterPage } from "../pages/RegisterPage.tsx";
 import { ProtectedRoute } from "../components/route/ProtectedRoute";
 import { PublicRoute } from "../components/route/PublicRoute";
 
-// ========================================
-// 🚀 ЛЕНИВАЯ ЗАГРУЗКА СТРАНИЦ
-// Оптимизация: код загружается только при переходе
-// ========================================
-const HomePage = lazy(() => import('../pages/HomePage'));
-const SuppliersPage = lazy(() => import('../pages/SuppliersPage'));
-const AnalyticsPage = lazy(() => import('../pages/AnalyticsPage'));
-const SupplierFormPage = lazy(() => import('../pages/SupplierFormPage'));
-const AnalysisDetailsPage = lazy(() => import('../pages/AnalysisDetailsPage'));
+// Ленивая загрузка страниц
+const HomePage = lazy(() => import("../pages/HomePage"));
+const SuppliersPage = lazy(() => import("../pages/SuppliersPage"));
+const AnalyticsPage = lazy(() => import("../pages/AnalyticsPage"));
+const SupplierFormPage = lazy(() => import("../pages/SupplierFormPage"));
+const AnalysisDetailsPage = lazy(() => import("../pages/AnalysisDetailsPage"));
 
 /**
  * 🔀 AppRoutes - Основная маршрутизация приложения
@@ -27,125 +24,90 @@ const AnalysisDetailsPage = lazy(() => import('../pages/AnalysisDetailsPage'));
  * └── ⚠️  Error Routes (обработка ошибок)
  */
 const AppRoutes: React.FC = () => {
-    return (
-        <BrowserRouter>
-            <Suspense fallback={<LoadingPage />}>
-                <Routes>
-                    {/* ═════════════════════════════════════════════════════════════
-                        🔒 ЗАЩИЩЁННЫЕ МАРШРУТЫ (требуют авторизации)
-                        ═════════════════════════════════════════════════════════════ */}
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<LoadingPage />}>
+        <Routes>
+          {/* Protected Routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <HomePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
-                    {/* 🏠 Главная страница - Панель управления */}
-                    <Route
-                        path="/"
-                        element={
-                            <ProtectedRoute>
-                                <Layout>
-                                    <HomePage />
-                                </Layout>
-                            </ProtectedRoute>
-                        }
-                    />
+          <Route
+            path="/suppliers"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SuppliersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
-                    {/* 👥 Страница поставщиков - Управление поставщиками */}
-                    <Route
-                        path="/suppliers"
-                        element={
-                            <ProtectedRoute>
-                                <Layout>
-                                    <SuppliersPage />
-                                </Layout>
-                            </ProtectedRoute>
-                        }
-                    />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AnalyticsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
-                    {/* ═════════════════════════════════════════════════════════════
-                        🔓 ПУБЛИЧНЫЕ МАРШРУТЫ (доступны без авторизации)
-                        ═════════════════════════════════════════════════════════════ */}
+          <Route
+            path="/analytics/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AnalysisDetailsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
-                    {/* 🔐 Вход - Страница авторизации */}
-                    <Route
-                        path="/login"
-                        element={
-                            <PublicRoute>
-                                <LoginPage />
-                            </PublicRoute>
-                        }
-                    />
+          {/* Supplier Form - public page (link from WhatsApp) */}
+          <Route path="/supplier-form/:orderId/:supplierId" element={<SupplierFormPage />} />
 
-                    {/* ✍️ Регистрация - Создание аккаунта */}
-                    <Route
-                        path="/register"
-                        element={
-                            <PublicRoute>
-                                <RegisterPage />
-                            </PublicRoute>
-                        }
-                    />
+          {/* Public Routes */}
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
 
-                    {/* ═════════════════════════════════════════════════════════════
-                        ⚠️ ОБРАБОТКА ОШИБОК
-                        ═════════════════════════════════════════════════════════════ */}
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <RegisterPage />
+              </PublicRoute>
+            }
+          />
 
-                    {/* ❌ Catch-all маршрут - Несуществующие страницы */}
-                    <Route
-                        path="*"
-                        element={
-                            <Layout>
-                                <NotFoundPage />
-                            </Layout>
-                        </ProtectedRoute>
-                    } />
-
-                    {/* Suppliers page (public) */}
-                    <Route path="/suppliers" element={
-                        <Layout>
-                            <SuppliersPage />
-                        </Layout>
-                    } />
-
-                    {/* Analytics page */}
-                    <Route path="/analytics" element={
-                        <Layout>
-                            <AnalyticsPage />
-                        </Layout>
-                    } />
-
-                    {/* Analytics details page */}
-                    <Route path="/analytics/:id" element={
-                        <Layout>
-                            <AnalysisDetailsPage />
-                        </Layout>
-                    } />
-
-                    {/* Supplier Form - Public page without Layout */}
-                    <Route path="/supplier-form/:orderId/:supplierId" element={
-                        <SupplierFormPage />
-                    } />
-
-                    {/* Public Routes */}
-                    <Route path="/login" element={
-                        <PublicRoute>
-                            <LoginPage  />
-                        </PublicRoute>
-                    } />
-
-                    <Route path="/register" element={
-                        <PublicRoute>
-                            <RegisterPage />
-                        </PublicRoute>
-                    } />
-
-                    {/* Catch-all route */}
-                    <Route path="*" element={
-                        <Layout>
-                            <NotFoundPage />
-                        </Layout>
-                    } />
-                </Routes>
-            </Suspense>
-        </BrowserRouter>
-    );
+          {/* Catch-all route */}
+          <Route
+            path="*"
+            element={
+              <Layout>
+                <NotFoundPage />
+              </Layout>
+            }
+          />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
 };
 
 export default AppRoutes;

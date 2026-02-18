@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, ShoppingCart, TrendingUp, Users, Package, RefreshCw } from "lucide-react";
+import { Clock, ShoppingCart, Users, Package, RefreshCw } from "lucide-react";
 import { Orders } from "../components/Orders.tsx";
 import { ordersApi, Stats } from "../api/ordersApi";
 import axios from "axios";
@@ -59,10 +59,6 @@ const HomePage = () => {
         },
     ];
 
-    const handleStatClick = (statLabel: string) => {
-        console.log(`Clicked on: ${statLabel}`);
-        // Можно добавить навигацию или модальное окно с деталями
-    };
 
     return (
         <div className="container mx-auto px-6 py-8">

@@ -5,12 +5,15 @@
 ## 🚀 Быстрый старт
 
 ### Предварительные требования
-- Docker Desktop (или Docker + Docker Compose)
-- Git
+- Docker / Docker Compose
 
 ### Установка и запуск
 
-1. **Клонирование репозитория:**
 ```bash
-git clone <repository-url>
-cd ProcurePro
+docker compose up -d --build
+```
+
+### Порты
+- Frontend: http://localhost:5174
+- Backend API: http://localhost:5001
+- Postgres (host порт): localhost:5434 (внутри docker-сети: 5432)
