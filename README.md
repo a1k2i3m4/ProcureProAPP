@@ -16,4 +16,4 @@ docker compose up -d --build
 ### Порты
 - Frontend: http://localhost:5174
 - Backend API: http://localhost:5001
-- Postgres (host порт): localhost:5434 (внутри docker-сети: 5432)
+- Postgres (host порт): localhost:5436 (внутри docker-сети: 5432)
