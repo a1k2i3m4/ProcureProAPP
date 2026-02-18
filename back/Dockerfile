@@ -2,10 +2,13 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+# Копируем манифесты отдельно для кеша
+COPY package.json ./
+# package-lock.json может отсутствовать в некоторых окружениях (CI/копия репо)
+COPY package-lock.json ./
 
 # ставим только prod-зависимости
-RUN npm ci --omit=dev
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 COPY . .
 
