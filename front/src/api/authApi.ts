@@ -2,8 +2,8 @@
 import axios, {AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig} from 'axios'
 import {AuthCredentials, AuthResponse, RegisterData, User} from "../types/auth.ts";
 
-// В проде лучше использовать относительный baseURL (Nginx проксирует /api на backend)
-const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
+// В проде ходим относительным путём через Nginx (/api -> backend внутри docker-сети)
+const API_URL = ((import.meta.env.VITE_API_URL as string) || (import.meta.env.PROD ? '/api' : '')) as string;
 
 interface ApiResponse <T = unknown> {
     data: T;

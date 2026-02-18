@@ -31,6 +31,7 @@ front/.env.production.local
 front/build/
 front/.next/
 front/out/
+front/.env
 
 # IDE
 .vscode/
@@ -82,3 +83,8 @@ coverage/
 .env.test.local
 .env.production.local
 .env.local
+
+# Разрешаем коммитить примеры
+!.env.example
+!back/.env.example
+!front/.env.example

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // В проде API проксируется Nginx по пути /api
-const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
+const API_URL = ((import.meta.env.VITE_API_URL as string) || (import.meta.env.PROD ? '/api' : ''));
 
 const publicApi = axios.create({
     baseURL: API_URL,

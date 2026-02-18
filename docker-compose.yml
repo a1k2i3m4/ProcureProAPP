@@ -28,7 +28,7 @@ services:
     volumes:
       - ${ORDERS_DIR_HOST:-./back/orders}:/orders
     env_file:
-      - .env
+      - - ./.env
     environment:
       NODE_ENV: production
       PORT: 5000
