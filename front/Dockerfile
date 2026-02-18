@@ -3,9 +3,12 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Для кеша зависимостей
-COPY package.json ./
-COPY package-lock.json ./
+# Vite env variables are injected at build-time
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Для кеша зависимостей (lock может отсутствовать в некоторых окружениях)
+COPY package*.json ./
 
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
