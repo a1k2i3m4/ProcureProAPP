@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Package, Clock, FileText, Loader, RefreshCw } from "lucide-react";
+import { Package, Clock, FileText, Loader, RefreshCw, BarChart3 } from "lucide-react";
 import { Order, ordersApi } from "../api/ordersApi";
 import { Modal } from "./Modal";
+import { AnalysisModal } from "./AnalysisModal";
 
 export function Orders() {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -9,6 +10,8 @@ export function Orders() {
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'today'>('all');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
+    const [analysisOrderId, setAnalysisOrderId] = useState<string | null>(null);
 
     const fetchOrders = async () => {
         try {
@@ -74,6 +77,12 @@ export function Orders() {
         } catch (e) {
             console.error("Failed to load order details", e);
         }
+    };
+
+    const handleAnalyzeClick = (orderId: string) => {
+        setAnalysisOrderId(orderId);
+        setAnalysisModalOpen(true);
+        setSelectedOrder(null); // Close order details modal
     };
 
     return (
@@ -251,9 +260,35 @@ export function Orders() {
                                 </table>
                             </div>
                         </div>
+
+                        {/* Analyze Button */}
+                        <div className="pt-4 border-t border-gray-200">
+                            <button
+                                onClick={() => handleAnalyzeClick(selectedOrder.order_id)}
+                                className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                                <BarChart3 className="w-5 h-5" />
+                                🔍 Анализировать заказ
+                            </button>
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                                Найти лучших поставщиков и получить предложения через WhatsApp
+                            </p>
+                        </div>
                     </div>
                 )}
             </Modal>
+
+            {/* Analysis Modal */}
+            {analysisOrderId && (
+                <AnalysisModal
+                    isOpen={analysisModalOpen}
+                    onClose={() => {
+                        setAnalysisModalOpen(false);
+                        setAnalysisOrderId(null);
+                    }}
+                    orderId={analysisOrderId}
+                />
+            )}
         </div>
     );
 }

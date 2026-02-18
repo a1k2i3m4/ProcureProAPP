@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, MessageSquare, Users, LogOut, User, Settings } from "lucide-react";
+import { Home, BarChart3, Users, LogOut, User, Settings } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const Header: React.FC = () => {
@@ -25,7 +25,7 @@ const Header: React.FC = () => {
 
     const navItems = [
         { label: 'Главная', icon: <Home size={20} />, path: '/' },
-        { label: 'WhatsApp', icon: <MessageSquare size={20} />, path: '/whatsapp' },
+        { label: 'Аналитика', icon: <BarChart3 size={20} />, path: '/analytics' },
         { label: 'Поставщики', icon: <Users size={20} />, path: '/suppliers' },
     ];
 

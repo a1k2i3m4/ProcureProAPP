@@ -28,6 +28,9 @@ services:
       - ./back:/app
       - ./back/uploads:/app/uploads:ro
       - /app/node_modules
+      - ${ORDERS_DIR_HOST:-./back/orders}:/orders
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=5000
@@ -36,6 +39,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=procurepro
+      - ORDERS_DIR=/orders
     command: npm run dev
 
   frontend:

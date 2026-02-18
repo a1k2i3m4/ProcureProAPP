@@ -1,6 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
+// Ждём, пока файл перестанет изменяться по размеру (защита от частичной записи)
+async function waitForStableFile(filePath, { checks = 5, intervalMs = 200, minSizeBytes = 10 } = {}) {
+  let lastSize = -1;
+  for (let i = 0; i < checks; i++) {
+    const stat = await fs.promises.stat(filePath);
+    const size = stat.size;
+
+    if (size >= minSizeBytes && size === lastSize) {
+      return;
+    }
+
+    lastSize = size;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
 function parseOrderJson(jsonArray, sourceFile) {
   // Support: either one order array or multiple sequential ones in a file
   // Strategy: split by sentinel objects that have Id/fast, then group subsequent items until next sentinel
@@ -25,17 +41,11 @@ function parseOrderJson(jsonArray, sourceFile) {
 
     // item row
     if (current) {
-      // Only add if it looks like an item (has tovar or specific)
-      // or just add everything that is not a header?
-      // content of obj: {"tovar": "...", ...}
-
       const item = {
         tovar: String(obj.tovar || '').trim(),
         specific: String(obj.specific || '').trim(),
         qty: Number(obj.qty || 0),
       };
-      // Debug log if item is empty
-      // console.log('Parsed item:', item);
       current.items.push(item);
     }
   }
@@ -59,7 +69,6 @@ function parseOrderJson(jsonArray, sourceFile) {
 
 async function upsertOrders(pool, orders) {
   for (const o of orders) {
-    // Debug log to verify what is being sent to DB
     console.log(`[UPSERT] Order ${o.order_id} items length: ${o.items.length}, stringified len: ${JSON.stringify(o.items).length}`);
 
     await pool.query(
@@ -91,10 +100,21 @@ function watchOrdersFolder(baseDir, pool) {
   const processFile = async (filePath) => {
     const fileName = path.basename(filePath);
     try {
-      const raw = await fs.promises.readFile(filePath, 'utf8');
-      let data = JSON.parse(raw);
+      // Дождаться, пока файл полностью запишется
+      await waitForStableFile(filePath);
+
+      const rawFirst = await fs.promises.readFile(filePath, 'utf8');
+      let data;
+      try {
+        data = JSON.parse(rawFirst);
+      } catch (e) {
+        // ещё раз попробуем после небольшой паузы — частая ситуация при длинных файлах
+        await new Promise((r) => setTimeout(r, 400));
+        const rawSecond = await fs.promises.readFile(filePath, 'utf8');
+        data = JSON.parse(rawSecond);
+      }
+
       if (!Array.isArray(data)) {
-        // if file contains multiple arrays concatenated as objects, try wrap to array
         throw new Error('JSON root must be an array');
       }
       const orders = parseOrderJson(data, fileName);
@@ -124,7 +144,6 @@ function watchOrdersFolder(baseDir, pool) {
     if (!filename) return;
     if (filename.toLowerCase().endsWith('.json') && eventType === 'rename') {
       const full = path.join(baseDir, filename);
-      // small delay to ensure file is fully written
       setTimeout(() => {
         fs.existsSync(full) && processFile(full);
       }, 500);

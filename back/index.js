@@ -7,7 +7,13 @@ const path = require('path');
 
 const pool = require('./db');
 const suppliersRoutes = require('./routes/suppliersRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const supplierFormRoutes = require('./routes/supplierFormRoutes');
+const oneCRoutes = require('./routes/oneCRoutes');
 const { parseSuppliersFromCU } = require('./services/excelImport');
+const whatsappService = require('./services/whatsappService');
+const orderAnalyzer = require('./services/orderAnalyzer');
+const { CATEGORY_MAPPING } = require('./services/categoryMapper');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -25,6 +31,20 @@ async function initDb() {
   if (fs.existsSync(ordersSchemaPath)) {
     const ordersSql = fs.readFileSync(ordersSchemaPath, 'utf8');
     await pool.query(ordersSql);
+  }
+
+  // Analysis schema (WhatsApp integration)
+  const analysisSchemaPath = path.join(__dirname, 'sql', 'analysis_schema.sql');
+  if (fs.existsSync(analysisSchemaPath)) {
+    const analysisSql = fs.readFileSync(analysisSchemaPath, 'utf8');
+    await pool.query(analysisSql);
+  }
+
+  // Extended analytics schema
+  const analyticsExtendedSchemaPath = path.join(__dirname, 'sql', 'analytics_extended_schema.sql');
+  if (fs.existsSync(analyticsExtendedSchemaPath)) {
+    const analyticsExtendedSql = fs.readFileSync(analyticsExtendedSchemaPath, 'utf8');
+    await pool.query(analyticsExtendedSql);
   }
 
   await pool.query(
@@ -75,13 +95,17 @@ async function importOnce({ force = false } = {}) {
     );
     const categoryId = cat.rows[0].id;
 
+    const phoneDigits = normalizeDigitsPhone(r.phone || '');
+    const whatsappDigits = phoneDigits || null;
+
     await pool.query(
-      `INSERT INTO suppliers(name, contact_person, phone, category_id)
-       VALUES($1,$2,$3,$4)
+      `INSERT INTO suppliers(name, contact_person, phone, whatsapp, category_id)
+       VALUES($1,$2,$3,$4,$5)
        ON CONFLICT (name, phone, category_id) DO UPDATE SET
          contact_person = EXCLUDED.contact_person,
+         whatsapp = COALESCE(NULLIF(EXCLUDED.whatsapp, ''), suppliers.whatsapp),
          updated_at = NOW()`,
-      [r.supplier, r.contactPerson || null, r.phone || null, categoryId]
+      [r.supplier, r.contactPerson || null, r.phone || null, whatsappDigits, categoryId]
     );
   }
 
@@ -94,11 +118,100 @@ async function importOnce({ force = false } = {}) {
 }
 
 // Orders folder resolution (server vs local)
-const ORDERS_DIR = process.env.ORDERS_DIR || (process.env.NODE_ENV === 'production' ? '/var/www/orders' : path.join(process.cwd(), 'orders'));
+// Priority:
+// 1) ORDERS_DIR env (e.g. "/orders" inside docker)
+// 2) ORDERS_DIR_HOST_PATH env (e.g. "/home/ubuntu/testServer/data" on VPS when running without docker)
+// 3) default: ./orders (dev)
+const ORDERS_DIR =
+  process.env.ORDERS_DIR ||
+  process.env.ORDERS_DIR_HOST_PATH ||
+  (process.env.NODE_ENV === 'production'
+    ? '/home/ubuntu/testServer/data'
+    : path.join(process.cwd(), 'orders'));
+
+function safeCountJsonFiles(dirPath) {
+  try {
+    const list = fs.readdirSync(dirPath);
+    return list.filter((f) => f.toLowerCase().endsWith('.json')).length;
+  } catch {
+    return null;
+  }
+}
+
+// Debug: watcher status
+app.get('/api/debug/orders-watcher', (_req, res) => {
+  const processedDir = path.join(ORDERS_DIR, 'processed');
+  const errorsDir = path.join(ORDERS_DIR, 'errors');
+
+  res.json({
+    ok: true,
+    orders_dir: ORDERS_DIR,
+    exists: fs.existsSync(ORDERS_DIR),
+    processed_dir: processedDir,
+    errors_dir: errorsDir,
+    processed_json_count: safeCountJsonFiles(processedDir),
+    errors_json_count: safeCountJsonFiles(errorsDir)
+  });
+});
 
 // Register orders routes
 const ordersRoutes = require('./routes/ordersRoutes');
 app.use('/api', ordersRoutes);
+
+// 1C integration routes
+app.use('/api', oneCRoutes);
+
+// Register supplier form routes (public)
+app.use('/api', supplierFormRoutes);
+
+
+// Setup WhatsApp webhook
+whatsappService.setupWebhook(app, async (from, text, timestamp) => {
+  console.log(`📩 Received WhatsApp message from ${from}`);
+
+  try {
+    // Find supplier by WhatsApp number
+    const supplierResult = await pool.query(
+      `SELECT id, name FROM suppliers WHERE whatsapp = $1`,
+      [from]
+    );
+
+    if (supplierResult.rows.length === 0) {
+      console.log(`⚠️ Unknown supplier WhatsApp: ${from}`);
+      return;
+    }
+
+    const supplier = supplierResult.rows[0];
+
+    // Find active analysis for this supplier
+    const analysisResult = await pool.query(
+      `SELECT DISTINCT oa.order_id 
+       FROM order_analysis oa
+       WHERE oa.status = 'in_progress'
+       AND EXISTS (
+         SELECT 1 FROM suppliers s
+         JOIN categories c ON c.id = s.category_id
+         WHERE s.id = $1
+       )
+       ORDER BY oa.started_at DESC
+       LIMIT 1`,
+      [supplier.id]
+    );
+
+    if (analysisResult.rows.length === 0) {
+      console.log(`⚠️ No active analysis found for supplier ${supplier.name}`);
+      return;
+    }
+
+    const orderId = analysisResult.rows[0].order_id;
+
+    // Process the response
+    await orderAnalyzer.processResponse(pool, orderId, supplier.id, text);
+
+  } catch (error) {
+    console.error('Error processing WhatsApp message:', error);
+  }
+});
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -110,6 +223,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api', suppliersRoutes);
+app.use('/api', analyticsRoutes);
 
 app.post('/api/import/cu', async (req, res) => {
   try {
@@ -124,15 +238,146 @@ app.post('/api/import/cu', async (req, res) => {
   }
 });
 
+// POST /api/init-test-suppliers - Initialize test suppliers with WhatsApp numbers
+app.post('/api/init-test-suppliers', async (req, res) => {
+  try {
+    console.log('🔄 Initializing test suppliers...');
+
+    // Add categories
+    const categories = [
+      'Электроника',
+      'Канцтовары',
+      'Мебель',
+      'Строительные материалы',
+      'Хозяйственные товары'
+    ];
+
+    for (const cat of categories) {
+      await pool.query(
+        'INSERT INTO categories(name) VALUES($1) ON CONFLICT (name) DO NOTHING',
+        [cat]
+      );
+    }
+
+    // Add test suppliers
+    const suppliers = [
+      {
+        name: 'ТехноПлюс',
+        contact: 'Иван Петров',
+        phone: '+77011234567',
+        whatsapp: '77011234567',
+        category: 'Электроника',
+        rating: 4.8,
+        urgent: true
+      },
+      {
+        name: 'СуперКанц',
+        contact: 'Мария Иванова',
+        phone: '+77012345678',
+        whatsapp: '77012345678',
+        category: 'Канцтовары',
+        rating: 4.5,
+        urgent: true
+      },
+      {
+        name: 'МебельЦентр',
+        contact: 'Петр Сидоров',
+        phone: '+77013456789',
+        whatsapp: '77013456789',
+        category: 'Мебель',
+        rating: 4.2,
+        urgent: false
+      },
+      {
+        name: 'СтройМастер',
+        contact: 'Ольга Козлова',
+        phone: '+77014567890',
+        whatsapp: '77014567890',
+        category: 'Строительные материалы',
+        rating: 4.6,
+        urgent: true
+      },
+      {
+        name: 'ХозТовары Плюс',
+        contact: 'Дмитрий Смирнов',
+        phone: '+77015678901',
+        whatsapp: '77015678901',
+        category: 'Хозяйственные товары',
+        rating: 4.3,
+        urgent: false
+      }
+    ];
+
+    let added = 0;
+    for (const s of suppliers) {
+      const catResult = await pool.query(
+        'SELECT id FROM categories WHERE name = $1',
+        [s.category]
+      );
+
+      if (catResult.rows.length > 0) {
+        await pool.query(
+          `INSERT INTO suppliers (name, contact_person, phone, whatsapp, category_id, rating, can_urgent)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (name, phone, category_id) DO UPDATE SET
+             whatsapp = EXCLUDED.whatsapp,
+             rating = EXCLUDED.rating,
+             can_urgent = EXCLUDED.can_urgent`,
+          [s.name, s.contact, s.phone, s.whatsapp, catResult.rows[0].id, s.rating, s.urgent]
+        );
+        added++;
+      }
+    }
+
+    // Get count
+    const count = await pool.query(
+      'SELECT COUNT(*)::int as count FROM suppliers WHERE whatsapp IS NOT NULL AND whatsapp != \'\'',
+      []
+    );
+
+    console.log(`✅ Test suppliers initialized: ${added} suppliers added/updated`);
+    res.json({
+      ok: true,
+      message: 'Test suppliers initialized successfully',
+      suppliers_added: added,
+      total_with_whatsapp: count.rows[0].count
+    });
+  } catch (e) {
+    console.error('❌ Error initializing test suppliers:', e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
 // Start watcher after server starts
 function startOrdersWatcher() {
   const watcher = require('./services/ordersWatcher');
   watcher.watchOrdersFolder(ORDERS_DIR, pool);
 }
 
+function normalizeDigitsPhone(raw) {
+  return String(raw || '').replace(/[^\d]/g, '').trim();
+}
+
+async function ensureMappedCategoriesExist() {
+  // Ensure categories used by category mapper exist in DB
+  try {
+    const mappedCategoryNames = new Set();
+    for (const arr of Object.values(CATEGORY_MAPPING || {})) {
+      if (Array.isArray(arr)) arr.forEach((n) => n && mappedCategoryNames.add(String(n)));
+    }
+
+    for (const name of mappedCategoryNames) {
+      await pool.query('INSERT INTO categories(name) VALUES($1) ON CONFLICT (name) DO NOTHING', [name]);
+    }
+  } catch (e) {
+    console.warn('⚠️ ensureMappedCategoriesExist failed:', String(e.message || e));
+  }
+}
+
 (async () => {
   try {
     await initDb();
+    await ensureMappedCategoriesExist();
     // при старте делаем авто-импорт только если еще не импортировали
     await importOnce({ force: false });
     app.listen(PORT, '0.0.0.0', () => {
