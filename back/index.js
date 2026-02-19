@@ -52,6 +52,13 @@ app.options('*', cors());
 app.use(express.json());
 
 async function initDb() {
+  // Auth schema (users, refresh_tokens) — must go first
+  const authSchemaPath = path.join(__dirname, 'sql', 'auth_schema.sql');
+  if (fs.existsSync(authSchemaPath)) {
+    const authSql = fs.readFileSync(authSchemaPath, 'utf8');
+    await pool.query(authSql);
+  }
+
   const schemaPath = path.join(__dirname, 'sql', 'schema.sql');
   const sql = fs.readFileSync(schemaPath, 'utf8');
   await pool.query(sql);
