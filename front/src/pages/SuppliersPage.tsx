@@ -33,8 +33,8 @@ export default function SuppliersPage() {
         setError(null);
 
         const [catsRes, supsRes] = await Promise.all([
-          publicApi.get<CategoryApi[]>('/api/categories'),
-          publicApi.get<SupplierApi[]>('/api/suppliers', {
+          publicApi.get<CategoryApi[]>('/categories'),
+          publicApi.get<SupplierApi[]>('/suppliers', {
             params: {
               category: selectedCategory || undefined,
               q: query || undefined,
@@ -58,7 +58,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     const loadCounts = async () => {
       try {
-        const res = await publicApi.get<CountsApi>('/api/debug/counts');
+        const res = await publicApi.get<CountsApi>('/debug/counts');
         setCounts(res.data);
       } catch {
         setCounts(null);
