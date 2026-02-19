@@ -27,16 +27,19 @@ services:
       - "5001:5000"
     volumes:
       - ${ORDERS_DIR_HOST:-./back/orders}:/orders
-    env_file: ./.env
     environment:
       NODE_ENV: production
       PORT: 5000
-      DB_HOST: ${DB_HOST:-postgres}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER:-${POSTGRES_USER:-postgres}}
-      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-postgres}}
-      DB_NAME: ${DB_NAME:-${POSTGRES_DB:-procurepro}}
+      # DB credentials — must match postgres service above
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: procurepro
       ORDERS_DIR: /orders
+      # Optional extras from host .env
+      JWT_SECRET: ${JWT_SECRET:-changeme_jwt_secret_32chars_min}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://82.115.42.79:8083,http://localhost:8083,http://localhost:3000}
     restart: unless-stopped
 
   # Frontend (Nginx + static build)
@@ -44,7 +47,8 @@ services:
     build:
       context: ./front
       args:
-        VITE_API_URL: ${VITE_API_URL:-/api}
+        # Always use nginx proxy — do NOT override this with localhost URLs
+        VITE_API_URL: /api
     container_name: react-frontend
     depends_on:
       - backend
