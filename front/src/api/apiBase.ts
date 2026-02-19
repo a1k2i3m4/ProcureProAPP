@@ -17,8 +17,9 @@ export function getApiBaseUrl(): string {
   const envUrl = viteUrl || reactAppAlias;
   if (envUrl) return envUrl;
 
-  // fallback для разработки (как в задаче)
-  return 'http://localhost:5000';
+  // fallback — /api работает через nginx-прокси (прод и dev с proxy)
+  // Для прямого dev без прокси создайте front/.env.local: VITE_API_URL=http://localhost:5000
+  return '/api';
 }
 
 export const publicApi: AxiosInstance = axios.create({
