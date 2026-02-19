@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Clock, ShoppingCart, Users, Package, RefreshCw } from "lucide-react";
 import { Orders } from "../components/Orders.tsx";
 import { ordersApi, Stats } from "../api/ordersApi";
-import axios from "axios";
+import { publicApi } from "../api/apiBase";
 
 const HomePage = () => {
     const [stats, setStats] = useState<Stats | null>(null);
@@ -14,7 +14,7 @@ const HomePage = () => {
             const [ordersStats, debugCounts] = await Promise.all([
                 ordersApi.getStats(),
                 // Quick fetch for suppliers count (reusing debug endpoint or create proper api)
-                axios.get<{ suppliers: number }>((import.meta.env.VITE_API_URL ?? 'http://localhost:5001') + '/api/debug/counts')
+                publicApi.get<{ suppliers: number }>(`/debug/counts`)
             ]);
             setStats(ordersStats);
             setSuppliersCount(debugCounts.data.suppliers || 0);

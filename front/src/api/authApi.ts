@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 import axios, {AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig} from 'axios'
 import {AuthCredentials, AuthResponse, RegisterData, User} from "../types/auth.ts";
+import { getApiBaseUrl } from './apiBase';
 
-// В проде ходим относительным путём через Nginx (/api -> backend внутри docker-сети)
-const API_URL = ((import.meta.env.VITE_API_URL as string) || (import.meta.env.PROD ? '/api' : '')) as string;
+const API_URL = getApiBaseUrl();
 
 interface ApiResponse <T = unknown> {
     data: T;

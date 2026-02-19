@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Package, Send, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../api/apiBase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_URL = getApiBaseUrl();
 
 type ApiErrorBody = { message?: string };
 function getApiErrorMessage(data: unknown): string | null {

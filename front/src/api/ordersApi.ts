@@ -1,13 +1,4 @@
-import axios from 'axios';
-
-// В проде API проксируется Nginx по пути /api
-const API_URL = ((import.meta.env.VITE_API_URL as string) || (import.meta.env.PROD ? '/api' : ''));
-
-const publicApi = axios.create({
-    baseURL: API_URL,
-    headers: { 'Content-Type': 'application/json' },
-    timeout: 10000,
-});
+import { publicApi } from './apiBase';
 
 export interface OrderItem {
     tovar: string;

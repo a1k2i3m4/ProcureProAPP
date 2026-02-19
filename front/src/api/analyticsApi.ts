@@ -1,7 +1,4 @@
-import axios from 'axios';
-
-// В проде API проксируется Nginx по пути /api
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { publicApi } from './apiBase';
 
 export interface AnalysisSummary {
   id: number;
@@ -70,49 +67,49 @@ export const analyticsApi = {
     offset?: number;
     status?: string;
   }) => {
-    const response = await axios.get(`${API_URL}/api/analyses`, { params });
+    const response = await publicApi.get(`/analyses`, { params });
     return response.data;
   },
 
   // Get detailed analysis by ID
   getAnalysisById: async (id: number) => {
-    const response = await axios.get(`${API_URL}/api/analyses/${id}`);
+    const response = await publicApi.get(`/analyses/${id}`);
     return response.data;
   },
 
   // Get analytics summary
   getAnalyticsSummary: async () => {
-    const response = await axios.get(`${API_URL}/api/analytics/summary`);
+    const response = await publicApi.get(`/analytics/summary`);
     return response.data;
   },
 
   // Delete analysis
   deleteAnalysis: async (id: number) => {
-    const response = await axios.delete(`${API_URL}/api/analyses/${id}`);
+    const response = await publicApi.delete(`/analyses/${id}`);
     return response.data;
   },
 
   // Get analysis status by order ID
   getAnalysisStatus: async (orderId: string) => {
-    const response = await axios.get(`${API_URL}/api/orders/${orderId}/analysis-status`);
+    const response = await publicApi.get(`/orders/${orderId}/analysis-status`);
     return response.data;
   },
 
   // Complete analysis manually
   completeAnalysis: async (orderId: string) => {
-    const response = await axios.post(`${API_URL}/api/orders/${orderId}/complete-analysis`);
+    const response = await publicApi.post(`/orders/${orderId}/complete-analysis`);
     return response.data;
   },
 
   // Restart analysis
   restartAnalysis: async (orderId: string) => {
-    const response = await axios.post(`${API_URL}/api/orders/${orderId}/restart-analysis`);
+    const response = await publicApi.post(`/orders/${orderId}/restart-analysis`);
     return response.data;
   },
 
   // Get best offers for an order
   getBestOffers: async (orderId: string, limit?: number) => {
-    const response = await axios.get(`${API_URL}/api/orders/${orderId}/best-offers`, {
+    const response = await publicApi.get(`/orders/${orderId}/best-offers`, {
       params: { limit }
     });
     return response.data;
@@ -120,7 +117,7 @@ export const analyticsApi = {
 
   // Get optimal combination
   getOptimalCombination: async (orderId: string) => {
-    const response = await axios.get(`${API_URL}/api/orders/${orderId}/optimal-combination`);
+    const response = await publicApi.get(`/orders/${orderId}/optimal-combination`);
     return response.data;
   },
 };

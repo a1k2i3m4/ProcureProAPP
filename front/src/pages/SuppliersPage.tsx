@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import { publicApi } from '../api/apiBase';
 import { SupplierCard } from '../components/SupplierCard';
 
 type SupplierApi = {
@@ -12,14 +12,6 @@ type SupplierApi = {
 
 type CategoryApi = { id: number; name: string };
 type CountsApi = { categories: number; suppliers: number };
-
-const API_URL = (import.meta.env.VITE_API_URL as string) ?? 'http://localhost:5001';
-
-const publicApi = axios.create({
-  baseURL: API_URL,
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 10000,
-});
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierApi[]>([]);
@@ -132,7 +124,7 @@ export default function SuppliersPage() {
       </div>
 
       <div className="mt-3 text-xs text-gray-500">
-        <div>API: <span className="font-mono">{API_URL}</span></div>
+        <div>API: <span className="font-mono">{import.meta.env.VITE_API_URL}</span></div>
         {counts && (
           <div>DB: categories={counts.categories}, suppliers={counts.suppliers}</div>
         )}

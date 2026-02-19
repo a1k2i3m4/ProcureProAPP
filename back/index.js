@@ -8,6 +8,7 @@ const path = require('path');
 const pool = require('./db');
 const suppliersRoutes = require('./routes/suppliersRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const authRoutes = require('./routes/authRoutes');
 const supplierFormRoutes = require('./routes/supplierFormRoutes');
 const oneCRoutes = require('./routes/oneCRoutes');
 const { parseSuppliersFromCU } = require('./services/excelImport');
@@ -157,6 +158,9 @@ app.get('/api/debug/orders-watcher', (_req, res) => {
 // Register orders routes
 const ordersRoutes = require('./routes/ordersRoutes');
 app.use('/api', ordersRoutes);
+
+// Auth routes
+app.use('/api/auth', authRoutes);
 
 // 1C integration routes
 app.use('/api', oneCRoutes);
