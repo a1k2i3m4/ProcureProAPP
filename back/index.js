@@ -19,7 +19,36 @@ const { CATEGORY_MAPPING } = require('./services/categoryMapper');
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'] }));
+// CORS
+// В проде (docker+nginx) фронт обычно ходит на /api (same-origin) и CORS не требуется,
+// но оставляем корректную настройку для прямых запросов (dev/отладка).
+const defaultAllowedOrigins = [
+  'http://82.115.42.79:8083',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8083'
+];
+
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  : defaultAllowedOrigins
+);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // non-browser clients (curl/postman) may send no Origin
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.options('*', cors());
+
 app.use(express.json());
 
 async function initDb() {
