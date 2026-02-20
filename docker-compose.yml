@@ -37,7 +37,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: procurepro
       ORDERS_DIR: /orders
-      #ONEC_API_KEY: procurepro-1c-secret-key
+      # ONEC_API_KEY: procurepro-1c-secret-key
       # Optional extras from host .env
       JWT_SECRET: ${JWT_SECRET:-changeme_jwt_secret_32chars_min}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-changeme_refresh_secret_32chars_min}
