@@ -3,12 +3,12 @@
 const axios = require('axios');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v22.0';
-const WHATSAPP_TOKEN = process.env.WHATSAPP_API_TOKEN || 'EAASixjgSKEkBQoc1WWubPX3gmStKMg9JyHfQQSkfZAlEkGpFSUF2GnUfVLdus14I0DZCsrYhWqO97hLZBqrcFnqyHgSF2k0Egaa8HBckvSm1g0TdVWcqMZCicf9D2pelOakXt60R2UGeJMAwP61JLN2WEm6UpdsmqVZCsyOXpZBALZCZBP6sL5ropaZBkUJHCeY6M0ZACuLlfOllcHm5VWoZAylxned2Nh0bnU3TYvZAkBeY5W5CjZCwaGYas9MKaxJGzGYjd7vzvmP6HYT5TZCIHlSAQgZAQZDZD';
+const WHATSAPP_TOKEN = process.env.WHATSAPP_API_TOKEN || 'EAASixjgSKEkBQ9OD61fKZBT8Q4e48nHkPdqttIwCjQLJdWJe2773OShXbycgaPHuQvHrD5wqB7ozYhDWp2i16jCRcYpZCcAqacUHJVWmRb7hUSOVKv9mySzzgKpAlscORijXCYQo8r0ZBQpxI4ZBe8SuQXrSZAYLhJNUSkrzqy0uDfaT3C653v1WKnjZANcwZDZD';
 // phone_number_id from Meta (do NOT confuse with phone number)
 // Backward-compatible: some env files used WHATSAPP_PHONE_NUMBER for phone_number_id
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER || '1010579552142404';
+const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER || '1007855415740100';
 const MOCK_MODE = process.env.WHATSAPP_MOCK_MODE === 'true';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://82.115.42.79:8083';
 
 if (process.env.NODE_ENV === 'development') {
   const hasToken = Boolean(WHATSAPP_TOKEN);

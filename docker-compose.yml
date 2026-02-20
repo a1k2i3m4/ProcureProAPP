@@ -43,6 +43,16 @@ services:
       JWT_EXPIRE: ${JWT_EXPIRE:-1h}
       JWT_REFRESH_EXPIRE: ${JWT_REFRESH_EXPIRE:-30d}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://82.115.42.79:8083,http://localhost:8083,http://localhost:3000}
+      # WhatsApp Cloud API
+      WHATSAPP_API_URL: https://graph.facebook.com/v22.0
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-EAASixjgSKEkBQ9OD61fKZBT8Q4e48nHkPdqttIwCjQLJdWJe2773OShXbycgaPHuQvHrD5wqB7ozYhDWp2i16jCRcYpZCcAqacUHJVWmRb7hUSOVKv9mySzzgKpAlscORijXCYQo8r0ZBQpxI4ZBe8SuQXrSZAYLhJNUSkrzqy0uDfaT3C653v1WKnjZANcwZDZD}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-1007855415740100}
+      WHATSAPP_MOCK_MODE: "false"
+      WHATSAPP_VERIFY_TOKEN: procurepro_verify_token
+      # Frontend URL for supplier form links in WhatsApp messages
+      FRONTEND_URL: ${FRONTEND_URL:-http://82.115.42.79:8083}
+      # 1C integration key
+      ONEC_API_KEY: ${ONEC_API_KEY:-procurepro-1c-secret-key}
     restart: unless-stopped
 
   # Frontend (Nginx + static build)
