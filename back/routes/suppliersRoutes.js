@@ -33,7 +33,7 @@ router.get('/suppliers', async (req, res) => {
     }
 
     const sql = `
-      SELECT s.id, s.name, s.contact_person, s.phone, c.name AS category
+      SELECT s.id, s.name, s.contact_person, s.phone, s.whatsapp, c.name AS category
       FROM suppliers s
       LEFT JOIN categories c ON c.id = s.category_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
