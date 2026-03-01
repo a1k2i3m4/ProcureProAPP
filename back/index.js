@@ -282,7 +282,14 @@ app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e.message || e) });
+    res.status(500).json({
+      ok: false,
+      error: String(e.message || e),
+      code: e.code,
+      db_host: process.env.DB_HOST,
+      db_user: process.env.DB_USER,
+      db_name: process.env.DB_NAME,
+    });
   }
 });
 
@@ -439,18 +446,37 @@ async function ensureMappedCategoriesExist() {
 }
 
 (async () => {
-  try {
-    await initDb();
-    await ensureMappedCategoriesExist();
-    // при старте делаем авто-импорт только если еще не импортировали
-    await importOnce({ force: false });
+  // Start HTTP server first so nginx doesn't get 502 during DB init
+  await new Promise((resolve) => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Backend listening on http://0.0.0.0:${PORT}`);
       console.log(`📂 Orders directory: ${ORDERS_DIR}`);
-      startOrdersWatcher();
+      resolve();
     });
+  });
+
+  try {
+    await initDb();
+    console.log('✅ Database initialized');
   } catch (e) {
-    console.error('❌ Startup error:', e);
-    process.exit(1);
+    console.error('❌ initDb error:', e.message);
+    console.error('   code:', e.code, '| detail:', e.detail);
+    console.error('   DB_HOST:', process.env.DB_HOST, 'DB_USER:', process.env.DB_USER, 'DB_NAME:', process.env.DB_NAME);
+    console.error('   → Backend will keep running but DB queries will fail until the issue is fixed');
+    return; // skip importOnce and watcher — DB is not ready
   }
+
+  try {
+    await ensureMappedCategoriesExist();
+  } catch (e) {
+    console.warn('⚠️ ensureMappedCategoriesExist failed:', e.message);
+  }
+
+  try {
+    await importOnce({ force: false });
+  } catch (e) {
+    console.warn('⚠️ importOnce failed:', e.message);
+  }
+
+  startOrdersWatcher();
 })();
