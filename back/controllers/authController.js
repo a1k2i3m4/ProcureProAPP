@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
+// Use the main pool (same as index.js) to avoid double-pool issues
+const pool = require('../db');
 
 // Генерирование JWT токена
 const generateToken = (userId, email, username) => {
@@ -92,9 +93,11 @@ exports.register = async (req, res) => {
             message: 'Пользователь успешно зарегистрирован'
         });
     } catch (error) {
-        console.error('Registration error:', error);
+        console.error('Registration error:', error.message || error);
+        console.error('Registration error stack:', error.stack);
         res.status(500).json({
-            message: 'Ошибка при регистрации'
+            message: 'Ошибка при регистрации',
+            detail: process.env.NODE_ENV !== 'production' ? (error.message || String(error)) : undefined
         });
     }
 };
@@ -159,9 +162,11 @@ exports.login = async (req, res) => {
             message: 'Успешный вход'
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login error:', error.message || error);
+        console.error('Login error stack:', error.stack);
         res.status(500).json({
-            message: 'Ошибка при входе'
+            message: 'Ошибка при входе',
+            detail: process.env.NODE_ENV !== 'production' ? (error.message || String(error)) : undefined
         });
     }
 };
