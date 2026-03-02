@@ -6,8 +6,36 @@
  */
 
 const { chromium } = require('playwright');
+const { execSync } = require('child_process');
 const { URL } = require('url');
 const logger = require('../utils/logger');
+
+// ─── Определяем путь к Chromium ──────────────────────────────────────────────
+
+function findChromiumPath() {
+  // 1. Явно задан через env
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+  // 2. Пробуем найти в системе
+  const candidates = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/snap/bin/chromium',
+  ];
+  for (const p of candidates) {
+    try {
+      execSync(`test -x ${p}`, { stdio: 'ignore' });
+      logger.info('[SupplierSearch] Using system Chromium: %s', p);
+      return p;
+    } catch (_) {}
+  }
+  // 3. Не нашли — позволим Playwright использовать встроенный (если установлен)
+  logger.warn('[SupplierSearch] System Chromium not found, using Playwright built-in');
+  return undefined;
+}
 
 // ─── B2B платформы ────────────────────────────────────────────────────────────
 const B2B_PLATFORMS = [
@@ -83,11 +111,11 @@ class SupplierSearchEngine {
   // ── Жизненный цикл браузера ──────────────────────────────────────────────
 
   async start() {
-    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined;
+    const executablePath = findChromiumPath();
     this._browser = await chromium.launch({
       headless: true,
       executablePath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     });
     this._context = await this._browser.newContext({
       userAgent:
@@ -400,5 +428,7 @@ async function searchAndSave(pool, nomenclature, opts = {}) {
 }
 
 module.exports = { SupplierSearchEngine, searchAndSave, buildQueries };
+
+
 
 
