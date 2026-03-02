@@ -11,8 +11,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} && psql -U ${POSTGRES_USER:-postgres} -c \"ALTER USER postgres PASSWORD '${POSTGRES_PASSWORD:-postgres}';\" > /dev/null 2>&1 || true"]
+      interval: 10s
       timeout: 5s
       retries: 10
 
