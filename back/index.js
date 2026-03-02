@@ -108,6 +108,13 @@ async function initDb() {
     await pool.query(analyticsExtendedSql);
   }
 
+  // Internet supplier search cache schema
+  const supplierSearchSchemaPath = path.join(__dirname, 'sql', 'supplier_search_schema.sql');
+  if (fs.existsSync(supplierSearchSchemaPath)) {
+    const supplierSearchSql = fs.readFileSync(supplierSearchSchemaPath, 'utf8');
+    await pool.query(supplierSearchSql);
+  }
+
   await pool.query(
     'CREATE TABLE IF NOT EXISTS import_flags (key TEXT PRIMARY KEY, value TEXT, created_at TIMESTAMP DEFAULT NOW())'
   );
@@ -221,6 +228,10 @@ app.use('/api', ordersRoutes);
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+
+// Supplier internet search routes
+const supplierSearchRoutes = require('./routes/supplierSearchRoutes');
+app.use('/api', supplierSearchRoutes);
 
 // 1C integration routes
 app.use('/api', oneCRoutes);
