@@ -72,6 +72,17 @@ exports.register = async (req, res) => {
         const token = generateToken(user.id, user.email, user.username);
         const refreshToken = generateRefreshToken(user.id);
 
+        // Гарантируем существование таблицы refresh_tokens
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token TEXT UNIQUE NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
         // Сохраняем refresh token в БД
         await pool.query(
             'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 days\')',
@@ -97,7 +108,7 @@ exports.register = async (req, res) => {
         console.error('Registration error stack:', error.stack);
         res.status(500).json({
             message: 'Ошибка при регистрации',
-            detail: process.env.NODE_ENV !== 'production' ? (error.message || String(error)) : undefined
+            detail: error.message || String(error)
         });
     }
 };
@@ -141,6 +152,17 @@ exports.login = async (req, res) => {
         const token = generateToken(user.id, user.email, user.username);
         const refreshToken = generateRefreshToken(user.id);
 
+        // Гарантируем существование таблицы refresh_tokens
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token TEXT UNIQUE NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
         // Сохраняем refresh token в БД
         await pool.query(
             'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 days\')',
@@ -166,7 +188,7 @@ exports.login = async (req, res) => {
         console.error('Login error stack:', error.stack);
         res.status(500).json({
             message: 'Ошибка при входе',
-            detail: process.env.NODE_ENV !== 'production' ? (error.message || String(error)) : undefined
+            detail: error.message || String(error)
         });
     }
 };
