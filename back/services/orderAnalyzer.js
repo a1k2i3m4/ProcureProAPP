@@ -127,31 +127,58 @@ async function startAnalysis(pool, orderId) {
     // Send WhatsApp messages to suppliers
     let successCount = 0;
     const forcedWhatsAppNumber = process.env.WHATSAPP_TEST_NUMBER || null;
-    const sendMode = String(process.env.WHATSAPP_SEND_MODE || 'text').toLowerCase();
-    const templateName = process.env.WHATSAPP_TEMPLATE_NAME || 'hello_world';
-    const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || 'en_US';
+    const sendMode = String(process.env.WHATSAPP_SEND_MODE || 'template').toLowerCase();
+    const templateName = process.env.WHATSAPP_TEMPLATE_NAME || 'tender';
+    const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || 'ru';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://82.115.42.79:8083';
 
     for (const supplier of suppliers) {
       try {
         const targetNumber = forcedWhatsAppNumber || supplier.whatsapp;
 
         if (sendMode === 'template') {
+          // Шаблон tender: body содержит {{1}} — полная ссылка на форму поставщика
+          const formUrl = `${frontendUrl}/supplier-form/${orderId}/${supplier.id}`;
+
+          const components = [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: formUrl }
+              ]
+            }
+          ];
+
           await whatsappService.sendTemplateMessage(targetNumber, {
             templateName,
-            languageCode: templateLang
+            languageCode: templateLang,
+            components
           });
         } else {
           await whatsappService.sendOrderToSupplier(targetNumber, order, supplier.id);
         }
 
         successCount++;
-        if (forcedWhatsAppNumber) {
-          console.log(`✅ Sent order ${orderId} to test number (${targetNumber}) for supplier ${supplier.id} mode=${sendMode}`);
-        } else {
-          console.log(`✅ Sent order ${orderId} to supplier ${supplier.name} (${targetNumber}) mode=${sendMode}`);
-        }
+        const formUrl = `${frontendUrl}/supplier-form/${orderId}/${supplier.id}`;
+        // Сохраняем запись об отправке
+        await pool.query(
+          `INSERT INTO supplier_notifications (order_id, supplier_id, whatsapp_number, status, form_url)
+           VALUES ($1, $2, $3, 'sent', $4)
+           ON CONFLICT (order_id, supplier_id) DO UPDATE SET
+             sent_at = NOW(), status = 'sent', error_message = NULL, form_url = EXCLUDED.form_url`,
+          [orderId, supplier.id, supplier.whatsapp, formUrl]
+        );
+        console.log(`✅ Sent order ${orderId} to ${forcedWhatsAppNumber ? 'test number' : supplier.name} (${targetNumber}) mode=${sendMode}`);
       } catch (error) {
         console.error(`Failed to send to supplier ${supplier.name}:`, error.message);
+        // Сохраняем ошибку отправки
+        await pool.query(
+          `INSERT INTO supplier_notifications (order_id, supplier_id, whatsapp_number, status, error_message)
+           VALUES ($1, $2, $3, 'failed', $4)
+           ON CONFLICT (order_id, supplier_id) DO UPDATE SET
+             sent_at = NOW(), status = 'failed', error_message = EXCLUDED.error_message`,
+          [orderId, supplier.id, supplier.whatsapp, error.message]
+        ).catch(() => {});
         await logError(pool, orderId, supplier.id, 'whatsapp_send', error.message, error.stack);
       }
     }
@@ -161,6 +188,9 @@ async function startAnalysis(pool, orderId) {
       `UPDATE order_analysis SET suppliers_contacted = $1 WHERE order_id = $2`,
       [successCount, orderId]
     );
+
+    // Всегда уведомляем владельца — даже если поставщики не нашлись
+    await whatsappService.sendAdminNotification(order, suppliers);
 
     // Set timeout to auto-complete analysis
     const timer = setTimeout(async () => {

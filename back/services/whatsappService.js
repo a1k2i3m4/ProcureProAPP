@@ -10,6 +10,9 @@ const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || process.env.WHATSAPP_
 const MOCK_MODE = process.env.WHATSAPP_MOCK_MODE === 'true';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://82.115.42.79:8083';
 
+// Номер владельца — получает уведомление о КАЖДОМ заказе всегда
+const ADMIN_NOTIFY_NUMBER = process.env.ADMIN_NOTIFY_NUMBER || '77072303223';
+
 if (process.env.NODE_ENV === 'development') {
   const hasToken = Boolean(WHATSAPP_TOKEN);
   const hasPhoneId = Boolean(WHATSAPP_PHONE_ID);
@@ -132,13 +135,17 @@ async function sendOrderToSupplier(whatsappNumber, orderData, supplierId) {
 }
 
 /**
- * Send a template message (useful for Cloud API test like hello_world).
+ * Send a template message with optional components (e.g. URL параметры).
  * @param {string} whatsappNumber - recipient number digits only (e.g. 77072303223)
  * @param {Object} options
- * @param {string} options.templateName
- * @param {string} options.languageCode
+ * @param {string} options.templateName   - имя шаблона, default 'tender'
+ * @param {string} options.languageCode   - язык шаблона, default 'ru'
+ * @param {Array}  options.components     - массив компонентов шаблона (параметры кнопки/тела)
+ *
+ * Пример components для шаблона с кнопкой-ссылкой:
+ * [{ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: 'SUFFIX' }] }]
  */
-async function sendTemplateMessage(whatsappNumber, { templateName = 'hello_world', languageCode = 'en_US' } = {}) {
+async function sendTemplateMessage(whatsappNumber, { templateName = 'tender', languageCode = 'ru', components = [] } = {}) {
   const normalizedNumber = normalizePhoneNumber(whatsappNumber);
 
   if (!normalizedNumber) {
@@ -149,22 +156,28 @@ async function sendTemplateMessage(whatsappNumber, { templateName = 'hello_world
   }
 
   if (MOCK_MODE) {
-    console.log('📱 [MOCK] WhatsApp template to', normalizedNumber, templateName);
+    console.log('📱 [MOCK] WhatsApp template to', normalizedNumber, templateName, JSON.stringify(components));
     return { success: true, mock: true, messageId: `mock_tpl_${Date.now()}` };
   }
 
   try {
     const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_ID}/messages`;
+
+    const templatePayload = {
+      name: templateName,
+      language: { code: languageCode }
+    };
+    if (components.length > 0) {
+      templatePayload.components = components;
+    }
+
     const response = await axios.post(
       url,
       {
         messaging_product: 'whatsapp',
         to: normalizedNumber,
         type: 'template',
-        template: {
-          name: templateName,
-          language: { code: languageCode }
-        }
+        template: templatePayload
       },
       {
         headers: {
@@ -175,17 +188,15 @@ async function sendTemplateMessage(whatsappNumber, { templateName = 'hello_world
       }
     );
 
+    console.log(`✅ Template '${templateName}' sent to ${normalizedNumber}`);
     return { success: true, messageId: response.data.messages?.[0]?.id, data: response.data };
   } catch (error) {
     const details = error.response?.data || { message: error.message };
     console.error('WhatsApp template send error to', normalizedNumber, ':', details);
-
-    // Более детальная информация об ошибке
     if (error.response) {
       console.error('Template Response status:', error.response.status);
       console.error('Template Response data:', JSON.stringify(error.response.data, null, 2));
     }
-
     throw new Error(`WhatsApp template send failed: ${details?.error?.message || error.message}`);
   }
 }
@@ -329,9 +340,69 @@ function setupWebhook(app, onMessageReceived) {
   });
 }
 
+/**
+ * Send a plain text message to any number (internal helper)
+ */
+async function sendTextMessage(toNumber, text) {
+  const normalized = normalizePhoneNumber(toNumber);
+  if (!normalized) throw new Error('sendTextMessage: missing number');
+
+  if (MOCK_MODE) {
+    console.log(`📱 [MOCK] sendTextMessage → ${normalized}: ${text.substring(0, 80)}...`);
+    return { success: true, mock: true, messageId: `mock_txt_${Date.now()}` };
+  }
+
+  const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_ID}/messages`;
+  const response = await axios.post(
+    url,
+    { messaging_product: 'whatsapp', to: normalized, type: 'text', text: { body: text } },
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' }, timeout: 15000 }
+  );
+  return { success: true, messageId: response.data.messages?.[0]?.id };
+}
+
+/**
+ * Отправить владельцу сводное уведомление о новом заказе.
+ * Вызывается ВСЕГДА — независимо от того найдены поставщики или нет.
+ * @param {Object} order  - объект заказа (order_id, fast, items)
+ * @param {Array}  suppliers - массив найденных поставщиков (может быть пустым)
+ */
+async function sendAdminNotification(order, suppliers = []) {
+  const adminNumber = ADMIN_NOTIFY_NUMBER;
+  if (!adminNumber) return;
+
+  const isUrgent = order.fast === 'yes';
+  const urgentTag = isUrgent ? ' 🚨 СРОЧНО' : '';
+  const itemsList = (Array.isArray(order.items) ? order.items : [])
+    .map((it, i) => `  ${i + 1}. ${it.tovar} — ${it.qty} шт.`)
+    .join('\n');
+
+  let msg = `📋 ProcurePro: новый заказ #${order.order_id}${urgentTag}\n\n`;
+  msg += `Товары:\n${itemsList || '  (нет данных)'}\n\n`;
+
+  if (suppliers.length > 0) {
+    msg += `✅ Уведомлены поставщики (${suppliers.length}):\n`;
+    suppliers.forEach(s => { msg += `  • ${s.name}\n`; });
+  } else {
+    msg += `⚠️ Поставщики не найдены — проверь категории товаров.\n`;
+  }
+
+  msg += `\n🔗 ${FRONTEND_URL}`;
+
+  try {
+    await sendTextMessage(adminNumber, msg);
+    console.log(`📲 Admin notification sent to ${adminNumber} for order ${order.order_id}`);
+  } catch (err) {
+    // Не бросаем ошибку — уведомление владельца не должно ломать основной флоу
+    console.error(`❌ Failed to send admin notification for order ${order.order_id}:`, err.message);
+  }
+}
+
 module.exports = {
   sendOrderToSupplier,
   sendTemplateMessage,
+  sendTextMessage,
+  sendAdminNotification,
   parseSupplierResponse,
   isValidResponse,
   formatOrderMessage,
