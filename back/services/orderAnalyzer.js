@@ -102,6 +102,8 @@ async function startAnalysis(pool, orderId) {
 
     if (categoryIds.length === 0) {
       await logError(pool, orderId, null, 'supplier_match', 'No matching categories found for order items');
+      // Всегда уведомляем владельца — даже при ошибке
+      await whatsappService.sendAdminNotification(order, []);
       throw new Error('No matching categories found for order items');
     }
 
@@ -110,6 +112,8 @@ async function startAnalysis(pool, orderId) {
 
     if (suppliers.length === 0) {
       await logError(pool, orderId, null, 'supplier_match', `No suppliers found for categories (urgent: ${isUrgent})`);
+      // Всегда уведомляем владельца — даже при ошибке
+      await whatsappService.sendAdminNotification(order, []);
       throw new Error(`No suppliers found with WhatsApp numbers for this order${isUrgent ? ' (urgent capable)' : ''}`);
     }
 

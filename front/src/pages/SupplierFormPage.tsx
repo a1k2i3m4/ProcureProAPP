@@ -87,7 +87,7 @@ const SupplierFormPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(`${API_URL}/api/supplier-form/${orderId}/${supplierId}`);
+      const response = await axios.get(`${API_URL}/supplier-form/${orderId}/${supplierId}`);
 
       if (response.data.success) {
         setOrderData(response.data.order);
@@ -210,7 +210,7 @@ const SupplierFormPage: React.FC = () => {
       }
 
       const response = await axios.post(
-        `${API_URL}/api/supplier-form/${orderId}/${supplierId}`,
+        `${API_URL}/supplier-form/${orderId}/${supplierId}`,
         payload
       );
 
