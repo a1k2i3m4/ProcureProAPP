@@ -41,6 +41,21 @@ CREATE TABLE IF NOT EXISTS supplier_responses (
 CREATE INDEX IF NOT EXISTS idx_supplier_responses_order_id ON supplier_responses(order_id);
 CREATE INDEX IF NOT EXISTS idx_supplier_responses_supplier_id ON supplier_responses(supplier_id);
 
+-- Уведомления поставщиков — кому и когда было отправлено сообщение по заказу
+CREATE TABLE IF NOT EXISTS supplier_notifications (
+  id SERIAL PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+  supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+  whatsapp_number TEXT NOT NULL,
+  sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  status TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent', 'failed')),
+  error_message TEXT,
+  form_url TEXT,
+  UNIQUE(order_id, supplier_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_supplier_notifications_order_id ON supplier_notifications(order_id);
+
 -- Optimal combination of suppliers for order items
 CREATE TABLE IF NOT EXISTS order_supplier_items (
   id SERIAL PRIMARY KEY,
