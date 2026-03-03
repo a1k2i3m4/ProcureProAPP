@@ -131,6 +131,23 @@ router.get('/analyses/:id', async (req, res) => {
       console.log('Supplier responses table not found:', err.message);
     }
 
+    // Кому было отправлено уведомление
+    let notifications = [];
+    try {
+      const notifResult = await pool.query(
+        `SELECT sn.*, s.name as supplier_name, s.rating, s.can_urgent, c.name as category_name
+         FROM supplier_notifications sn
+         LEFT JOIN suppliers s ON s.id = sn.supplier_id
+         LEFT JOIN categories c ON c.id = s.category_id
+         WHERE sn.order_id = $1
+         ORDER BY sn.sent_at ASC`,
+        [analysis.order_id]
+      );
+      notifications = notifResult.rows;
+    } catch (err) {
+      console.log('supplier_notifications table not found:', err.message);
+    }
+
     if (analysis.status === 'in_progress' && analysis.timeout_at) {
       const now = new Date();
       const timeoutAt = new Date(analysis.timeout_at);
@@ -152,7 +169,8 @@ router.get('/analyses/:id', async (req, res) => {
     res.json({
       analysis,
       errors: errorsResult.rows,
-      responses
+      responses,
+      notifications
     });
 
   } catch (error) {

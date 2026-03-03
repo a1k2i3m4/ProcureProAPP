@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Clock, Package, RefreshCw, Star, CheckCircle, XCircle, Flame, Truck } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Clock, Package, RefreshCw, Star, CheckCircle, XCircle, Flame, Truck, Send, MessageCircle } from 'lucide-react';
 import { analyticsApi } from '../api/analyticsApi';
 import { ordersApi, BestOffer, OptimalCombination } from '../api/ordersApi';
 
@@ -46,6 +46,20 @@ type AnalysisDetailsPayload = {
     stack_trace?: string | null;
     created_at: string;
     supplier_name?: string | null;
+  }>;
+  notifications?: Array<{
+    id: number;
+    order_id: string;
+    supplier_id: number;
+    supplier_name: string;
+    whatsapp_number: string;
+    sent_at: string;
+    status: 'sent' | 'failed';
+    error_message?: string | null;
+    form_url?: string | null;
+    rating?: number | null;
+    can_urgent?: boolean;
+    category_name?: string | null;
   }>;
 };
 
@@ -577,6 +591,66 @@ const AnalysisDetailsPage: React.FC = () => {
               </div>
             ) : (
               <p className="text-gray-600">Нет позиций</p>
+            )}
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-md rounded-xl p-6 border border-gray-200 shadow-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Send className="w-5 h-5 text-green-600" />
+              Уведомлены поставщики
+              <span className="ml-auto text-sm font-normal text-gray-500">
+                {data.notifications?.length ?? 0} получателей
+              </span>
+            </h2>
+            {data.notifications?.length ? (
+              <div className="space-y-2">
+                {data.notifications.map((n) => {
+                  const hasResponse = data.responses?.some(r => r.supplier_id === n.supplier_id);
+                  return (
+                    <div key={n.id} className={`flex items-center gap-3 p-3 rounded-xl border ${n.status === 'sent' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${n.status === 'sent' ? 'bg-green-100' : 'bg-red-100'}`}>
+                        {n.status === 'sent'
+                          ? <MessageCircle className="w-4 h-4 text-green-600" />
+                          : <XCircle className="w-4 h-4 text-red-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900">{n.supplier_name}</span>
+                          {n.category_name && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{n.category_name}</span>
+                          )}
+                          {n.can_urgent && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 flex items-center gap-1">
+                              <Flame className="w-3 h-3" />Срочно
+                            </span>
+                          )}
+                          {hasResponse && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" />Ответил
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-3">
+                          <span>📱 {n.whatsapp_number}</span>
+                          <span>⏱ {new Date(n.sent_at).toLocaleString('ru-RU')}</span>
+                          {n.rating && <span>⭐ {n.rating}</span>}
+                        </div>
+                        {n.status === 'failed' && n.error_message && (
+                          <div className="text-xs text-red-600 mt-1">⚠️ {n.error_message}</div>
+                        )}
+                        {n.form_url && (
+                          <a href={n.form_url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-purple-600 hover:underline mt-0.5 block truncate">
+                            🔗 {n.form_url}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">Данные об уведомлениях появятся после следующего анализа</p>
             )}
           </div>
 
