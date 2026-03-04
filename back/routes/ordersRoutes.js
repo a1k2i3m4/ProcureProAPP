@@ -6,6 +6,69 @@ const whatsappService = require('../services/whatsappService');
 
 const router = express.Router();
 
+// GET /api/orders/next-manual-id — следующий номер ручного заказа
+router.get('/orders/next-manual-id', async (_req, res) => {
+  try {
+    const q = await pool.query(
+      `SELECT order_id FROM orders WHERE source_file = 'manual' ORDER BY imported_at DESC`
+    );
+    let nextNum = 1;
+    if (q.rows.length > 0) {
+      const nums = q.rows
+        .map(r => parseInt((r.order_id || '').replace(/^manual-/i, ''), 10))
+        .filter(n => !isNaN(n));
+      if (nums.length > 0) nextNum = Math.max(...nums) + 1;
+    }
+    const nextId = `manual-${String(nextNum).padStart(3, '0')}`;
+    res.json({ next_id: nextId });
+  } catch (e) {
+    res.status(500).json({ message: 'Ошибка', error: String(e.message || e) });
+  }
+});
+
+// POST /api/orders — ручное создание заказа с фронтенда
+router.post('/orders', async (req, res) => {
+  try {
+    const { order_id, fast, items } = req.body;
+
+    if (!order_id || !String(order_id).trim()) {
+      return res.status(400).json({ message: 'order_id обязателен' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'items обязателен и должен быть непустым массивом' });
+    }
+
+    const orderId = String(order_id).trim();
+    const fastVal = fast === 'yes' ? 'yes' : 'no';
+    const normalizedItems = items.map(it => ({
+      tovar:    String(it.tovar || '').trim(),
+      specific: String(it.specific || '').trim(),
+      qty:      Number(it.qty) || 1,
+    })).filter(it => it.tovar);
+
+    if (normalizedItems.length === 0) {
+      return res.status(400).json({ message: 'Нет валидных товаров в items' });
+    }
+
+    const existing = await pool.query('SELECT id FROM orders WHERE order_id = $1', [orderId]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: `Заказ ${orderId} уже существует` });
+    }
+
+    await pool.query(
+      `INSERT INTO orders(order_id, fast, items, items_count, source_file, status, created_at, imported_at)
+       VALUES($1,$2,$3,$4,'manual','new',NOW(),NOW())`,
+      [orderId, fastVal, JSON.stringify(normalizedItems), normalizedItems.length]
+    );
+
+    console.log(`[MANUAL] Order ${orderId} created: ${normalizedItems.length} items, fast=${fastVal}`);
+    res.status(201).json({ ok: true, order_id: orderId, items_count: normalizedItems.length });
+  } catch (e) {
+    console.error('[POST /orders] error:', e);
+    res.status(500).json({ message: 'Ошибка создания заказа', error: String(e.message || e) });
+  }
+});
+
 // GET /api/orders
 router.get('/orders', async (_req, res) => {
   try {
