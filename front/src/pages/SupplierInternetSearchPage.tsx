@@ -96,6 +96,16 @@ const InternetSupplierCard: React.FC<SupplierCardProps> = ({ supplier, onDelete 
         </div>
       </div>
 
+      {/* Цена */}
+      {supplier.price != null && (
+        <div className="mb-3 inline-flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 rounded-lg px-3 py-1.5">
+          <span className="text-lg font-bold">
+            {new Intl.NumberFormat('ru-RU').format(supplier.price)} {supplier.price_currency ?? '₸'}
+          </span>
+          <span className="text-xs text-green-600">/ ед.</span>
+        </div>
+      )}
+
       {/* Описание */}
       {supplier.description && (
         <p className="text-sm text-gray-500 mb-3 line-clamp-2">{supplier.description}</p>
