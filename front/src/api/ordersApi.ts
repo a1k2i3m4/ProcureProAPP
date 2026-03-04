@@ -112,6 +112,14 @@ export interface AnalysisError {
 }
 
 export const ordersApi = {
+    createOrder: async (data: { order_id: string; fast: 'yes' | 'no'; items: OrderItem[] }) => {
+        const response = await publicApi.post('/orders', data);
+        return response.data;
+    },
+    getNextManualId: async (): Promise<{ next_id: string }> => {
+        const response = await publicApi.get<{ next_id: string }>('/orders/next-manual-id');
+        return response.data;
+    },
     getOrders: async () => {
         const response = await publicApi.get<Order[]>('/orders');
         return response.data;
