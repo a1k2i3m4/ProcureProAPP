@@ -84,6 +84,24 @@ function extractTelegrams(text) {
   });
 }
 
+/** Извлекает первую найденную цену из текста страницы (тенге / рубли) */
+function extractPrice(text) {
+  // Паттерны: "1 500 тг", "1500 тнг", "1 500 ₸", "1500 руб", "1 500 ₽", "от 500"
+  const patterns = [
+    /(?:от\s+)?([\d\s]{1,10}(?:[.,]\d{1,2})?)\s*(?:тг|тнг|₸|тенге)/i,
+    /(?:от\s+)?([\d\s]{1,10}(?:[.,]\d{1,2})?)\s*(?:руб|₽|рублей)/i,
+    /(?:цена|стоимость|price)[:\s]+(?:от\s+)?([\d\s]{1,10}(?:[.,]\d{1,2})?)/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) {
+      const num = parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
+      if (num > 0) return num;
+    }
+  }
+  return null;
+}
+
 /** Строит поисковые запросы по номенклатуре */
 function buildQueries(nomenclature, specs, region) {
   const base = nomenclature.trim();
@@ -337,6 +355,8 @@ class SupplierSearchEngine {
       phones:       [],
       telegrams:    [],
       found_via:    source,
+      price:        null,
+      price_currency: null,
     };
 
     let page;
@@ -350,6 +370,20 @@ class SupplierSearchEngine {
       supplier.emails    = extractEmails(bodyText);
       supplier.phones    = extractPhones(bodyText);
       supplier.telegrams = extractTelegrams(bodyText);
+
+      // Пытаемся найти цену на странице
+      const priceVal = extractPrice(bodyText);
+      if (priceVal) {
+        supplier.price = priceVal;
+        // Определяем валюту
+        if (/тг|тнг|₸|тенге/i.test(bodyText)) {
+          supplier.price_currency = '₸';
+        } else if (/руб|₽|рублей/i.test(bodyText)) {
+          supplier.price_currency = '₽';
+        } else {
+          supplier.price_currency = '₸';
+        }
+      }
 
       // Пробуем зайти на страницу "Контакты"
       if (supplier.emails.length === 0) {
@@ -405,18 +439,20 @@ async function searchAndSave(pool, nomenclature, opts = {}) {
     for (const s of suppliers) {
       await pool.query(
         `INSERT INTO internet_suppliers
-           (query, company_name, website, description, found_via, emails, phones, telegrams)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           (query, company_name, website, description, found_via, emails, phones, telegrams, price, price_currency)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          ON CONFLICT DO NOTHING`,
         [
           nomenclature,
           s.company_name,
-          s.website   || null,
-          s.description || null,
-          s.found_via || null,
-          s.emails    || [],
-          s.phones    || [],
-          s.telegrams || [],
+          s.website        || null,
+          s.description    || null,
+          s.found_via      || null,
+          s.emails         || [],
+          s.phones         || [],
+          s.telegrams      || [],
+          s.price          || null,
+          s.price_currency || null,
         ]
       ).catch((err) => logger.warn('[SupplierSearch] DB save error: %s', err.message));
     }

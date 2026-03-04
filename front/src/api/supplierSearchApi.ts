@@ -10,6 +10,8 @@ export interface InternetSupplier {
   phones: string[];
   telegrams: string[];
   created_at?: string;
+  price?: number | null;
+  price_currency?: string | null;
 }
 
 export interface SearchSuppliersRequest {
