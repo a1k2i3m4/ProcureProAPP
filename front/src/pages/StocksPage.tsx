@@ -237,7 +237,7 @@ export default function StocksPage() {
     const problemsCount = stats.out + stats.critical + stats.low;
 
     return (
-        <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6 pb-8 max-w-[1600px] mx-auto">
+        <div className="space-y-6 px-6 sm:px-10 lg:px-14 xl:px-16 pt-8 pb-12 max-w-[1600px] mx-auto">
             {/* ─── Header ──────────────────────────────────────────────────── */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 p-6 sm:p-8 text-white">
                 <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
