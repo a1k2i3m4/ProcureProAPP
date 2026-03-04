@@ -362,38 +362,39 @@ async function sendTextMessage(toNumber, text) {
 }
 
 /**
- * Отправить владельцу сводное уведомление о новом заказе.
- * Вызывается ВСЕГДА — независимо от того найдены поставщики или нет.
- * @param {Object} order  - объект заказа (order_id, fast, items)
+ * Отправить владельцу сводное уведомление о новом анализе заказа.
+ * Использует шаблон tender с {{1}} = ссылка на страницу аналитики.
+ * Вызывается ВСЕГДА при запуске анализа — даже если поставщики не найдены.
+ * @param {Object} order     - объект заказа (order_id, fast, items)
  * @param {Array}  suppliers - массив найденных поставщиков (может быть пустым)
  */
 async function sendAdminNotification(order, suppliers = []) {
   const adminNumber = ADMIN_NOTIFY_NUMBER;
   if (!adminNumber) return;
 
-  const isUrgent = order.fast === 'yes';
-  const urgentTag = isUrgent ? ' 🚨 СРОЧНО' : '';
-  const itemsList = (Array.isArray(order.items) ? order.items : [])
-    .map((it, i) => `  ${i + 1}. ${it.tovar} — ${it.qty} шт.`)
-    .join('\n');
+  // Ссылка на страницу аналитики — владелец видит полную картину
+  const analyticsUrl = `${FRONTEND_URL}/analytics`;
 
-  let msg = `📋 ProcurePro: новый заказ #${order.order_id}${urgentTag}\n\n`;
-  msg += `Товары:\n${itemsList || '  (нет данных)'}\n\n`;
-
-  if (suppliers.length > 0) {
-    msg += `✅ Уведомлены поставщики (${suppliers.length}):\n`;
-    suppliers.forEach(s => { msg += `  • ${s.name}\n`; });
-  } else {
-    msg += `⚠️ Поставщики не найдены — проверь категории товаров.\n`;
-  }
-
-  msg += `\n🔗 ${FRONTEND_URL}`;
+  const components = [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: analyticsUrl }
+      ]
+    }
+  ];
 
   try {
-    await sendTextMessage(adminNumber, msg);
-    console.log(`📲 Admin notification sent to ${adminNumber} for order ${order.order_id}`);
+    await sendTemplateMessage(adminNumber, {
+      templateName: 'tender',
+      languageCode: 'ru',
+      components
+    });
+    const suppliersInfo = suppliers.length > 0
+      ? `поставщиков уведомлено: ${suppliers.length}`
+      : 'поставщики не найдены';
+    console.log(`📲 Admin notified (${adminNumber}) order=${order.order_id} ${suppliersInfo}`);
   } catch (err) {
-    // Не бросаем ошибку — уведомление владельца не должно ломать основной флоу
     console.error(`❌ Failed to send admin notification for order ${order.order_id}:`, err.message);
   }
 }
