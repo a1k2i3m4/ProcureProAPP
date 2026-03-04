@@ -118,6 +118,22 @@ async function initDb() {
   await pool.query(
     'CREATE TABLE IF NOT EXISTS import_flags (key TEXT PRIMARY KEY, value TEXT, created_at TIMESTAMP DEFAULT NOW())'
   );
+
+  // Stocks table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stocks (
+      id               SERIAL PRIMARY KEY,
+      gs_code          TEXT,
+      group_name       TEXT,
+      name             TEXT NOT NULL,
+      contract_company TEXT,
+      min_stock        NUMERIC,
+      stock_qty        NUMERIC,
+      updated_at       TIMESTAMP DEFAULT NOW(),
+      CONSTRAINT stocks_name_unique UNIQUE(name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_stocks_group ON stocks(group_name);
+  `);
 }
 
 async function importOnce({ force = false } = {}) {
@@ -306,6 +322,14 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api', suppliersRoutes);
 app.use('/api', analyticsRoutes);
+
+try {
+  const stocksRoutes = require('./routes/stocksRoutes');
+  app.use('/api', stocksRoutes);
+  console.log('✅ stocksRoutes loaded');
+} catch (e) {
+  console.warn('⚠️  stocksRoutes not loaded:', e.message);
+}
 
 app.post('/api/import/cu', async (req, res) => {
   try {
