@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BarChart3, Users, LogOut, User, Settings, Search } from "lucide-react";
+import { Home, BarChart3, Users, LogOut, User, Settings, Search, Package } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const Header: React.FC = () => {
@@ -27,6 +27,7 @@ const Header: React.FC = () => {
         { label: 'Главная', icon: <Home size={20} />, path: '/' },
         { label: 'Аналитика', icon: <BarChart3 size={20} />, path: '/analytics' },
         { label: 'Поставщики', icon: <Users size={20} />, path: '/suppliers' },
+        { label: 'Остатки', icon: <Package size={20} />, path: '/stocks' },
         { label: 'Поиск в сети', icon: <Search size={20} />, path: '/supplier-search' },
     ];
 
