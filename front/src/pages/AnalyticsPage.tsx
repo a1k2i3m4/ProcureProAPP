@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart3, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Package, Eye, RefreshCw } from 'lucide-react';
 import { analyticsApi, AnalysisSummary } from '../api/analyticsApi';
 
 type AnalysisStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'timeout' | 'cancelled' | 'error';
 
 const AnalyticsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [analyses, setAnalyses] = useState<AnalysisSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<AnalysisStatus>('all');
@@ -266,7 +268,7 @@ const AnalyticsPage: React.FC = () => {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={() => window.location.href = `/analytics/${analysis.id}`}
+                    onClick={() => navigate(`/analytics/${analysis.id}`)}
                     className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 font-semibold"
                   >
                     <Eye className="w-5 h-5" />
