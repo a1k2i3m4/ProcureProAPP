@@ -23,7 +23,11 @@ const PORT = Number(process.env.PORT || 5000);
 // В проде (docker+nginx) фронт обычно ходит на /api (same-origin) и CORS не требуется,
 // но оставляем корректную настройку для прямых запросов (dev/отладка).
 const defaultAllowedOrigins = [
+  'https://manager.cucrm.kz',
+  'http://manager.cucrm.kz',
+  'http://82.115.42.79',
   'http://82.115.42.79:8083',
+  'http://localhost',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:8083'
