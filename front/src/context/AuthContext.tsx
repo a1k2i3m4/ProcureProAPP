@@ -34,16 +34,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const sessionId = params.get('sessionId')
             const token = localStorage.getItem('token')
 
-            // 1) Если токен уже есть — просто пробуем получить профиль
+            // 1) Если токен уже есть — используем сохранённого юзера из localStorage (SSO)
             if (token) {
+                const savedUser = localStorage.getItem('user')
+                if (savedUser) {
+                    try {
+                        setUser(JSON.parse(savedUser))
+                    } catch { /* ignore parse error */ }
+                    setLoading(false)
+                    return
+                }
+                // Фоллбек: пробуем getProfile() (работает только для локальных юзеров ProcurePro DB)
                 try {
                     const userData = await authApi.getProfile();
                     setUser(userData);
+                    localStorage.setItem('user', JSON.stringify(userData))
                 } catch (err) {
                     console.error('Ошибка при проверке авторизации:', err);
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
-                    localStorage.removeItem('user');
+                    // Пробуем декодировать юзера из JWT токена
+                    try {
+                        const payload = JSON.parse(atob(token.split('.')[1]))
+                        const fallbackUser = { id: payload.id || payload.sub || payload.phone, name: payload.name || payload.phone || 'User', phone: payload.phone, role: payload.role || 'user' }
+                        localStorage.setItem('user', JSON.stringify(fallbackUser))
+                        setUser(fallbackUser as any)
+                    } catch {
+                        // Совсем не удалось — чистим и редиректим
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('refreshToken');
+                        localStorage.removeItem('user');
+                    }
                 } finally {
                     setLoading(false);
                 }
