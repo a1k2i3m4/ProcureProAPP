@@ -3,10 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import LoadingPage from "../pages/LoadingPage";
 import NotFoundPage from "../pages/NotFoundPage.tsx";
-import { LoginPage } from "../pages/LoginPage.tsx";
-import { RegisterPage } from "../pages/RegisterPage.tsx";
 import { ProtectedRoute } from "../components/route/ProtectedRoute";
-import { PublicRoute } from "../components/route/PublicRoute";
+import { Navigate } from "react-router-dom";
 
 // Ленивая загрузка страниц
 const HomePage = lazy(() => import("../pages/HomePage"));
@@ -26,8 +24,11 @@ const StocksPage = lazy(() => import("../pages/StocksPage"));
  * └── ⚠️  Error Routes (обработка ошибок)
  */
 const AppRoutes: React.FC = () => {
+  // Get base path from environment (for docker deployment under /procurepro/)
+  const basename = import.meta.env.VITE_BASE_PATH?.replace(/\/$/, '') || '';
+  
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Suspense fallback={<LoadingPage />}>
         <Routes>
           {/* Protected Routes */}
@@ -101,23 +102,9 @@ const AppRoutes: React.FC = () => {
           <Route path="/supplier-form/:orderId/:supplierId" element={<SupplierFormPage />} />
 
           {/* Public Routes */}
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            }
-          />
-
-          <Route
-            path="/register"
-            element={
-              <PublicRoute>
-                <RegisterPage />
-              </PublicRoute>
-            }
-          />
+          {/* Auth routes are disabled: centralized login via AuthService */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<Navigate to="/" replace />} />
 
           {/* Catch-all route */}
           <Route

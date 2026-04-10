@@ -43,7 +43,8 @@ const Header: React.FC = () => {
     const handleLogout = async () => {
         try {
             await logout();
-            navigate("/login");
+            const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || "/";
+            window.location.href = authLoginUrl;
         } catch (error) {
             console.error("Ошибка при выходе:", error);
         } finally {

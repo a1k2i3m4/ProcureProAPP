@@ -27,10 +27,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     useEffect(() => {
         const initAuth = async (): Promise<void> => {
-            const token = localStorage.getItem('token');
-            const storedUser = localStorage.getItem('user');
+            const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || '/'
+            const authServiceUrl = ((import.meta as any).env?.VITE_AUTH_SERVICE_URL || '').replace(/\/+$/, '')
 
-            if (token && storedUser) {
+            const params = new URLSearchParams(window.location.search)
+            const sessionId = params.get('sessionId')
+            const token = localStorage.getItem('token')
+
+            // 1) Если токен уже есть — просто пробуем получить профиль
+            if (token) {
                 try {
                     const userData = await authApi.getProfile();
                     setUser(userData);
@@ -39,10 +44,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     localStorage.removeItem('token');
                     localStorage.removeItem('refreshToken');
                     localStorage.removeItem('user');
+                } finally {
+                    setLoading(false);
                 }
+                return
             }
-            setLoading(false);
-        };
+
+            // 2) Если пришли с sessionId — обмениваем его в AuthService на JWT (SSO)
+            if (sessionId) {
+                try {
+                    if (!authServiceUrl) {
+                        throw new Error('VITE_AUTH_SERVICE_URL is not set')
+                    }
+
+                    const resp = await fetch(`${authServiceUrl}/api/auth/session/${encodeURIComponent(sessionId)}`, {
+                        method: 'GET',
+                        credentials: 'include',
+                    })
+
+                    if (!resp.ok) {
+                        throw new Error('SESSION_EXCHANGE_FAILED')
+                    }
+
+                    const data: any = await resp.json().catch(() => null)
+                    const exchangedToken: string | undefined = data?.token
+                    const exchangedUser: any = data?.user || data?.employee || data?.supervisor || null
+
+                    if (!exchangedToken) {
+                        throw new Error('NO_TOKEN_IN_SESSION_EXCHANGE')
+                    }
+
+                    localStorage.setItem('token', exchangedToken)
+
+                    if (exchangedUser) {
+                        localStorage.setItem('user', JSON.stringify(exchangedUser))
+                        setUser(exchangedUser)
+                    } else {
+                        // Фоллбек — если юзер не вернулся, пробуем профиль
+                        const userData = await authApi.getProfile();
+                        setUser(userData);
+                    }
+
+                    // чистим sessionId из URL
+                    params.delete('sessionId')
+                    const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
+                    window.history.replaceState({}, '', newUrl)
+                } catch (err) {
+                    console.error('SESSION EXCHANGE ERROR:', err)
+                    window.location.href = authLoginUrl
+                } finally {
+                    setLoading(false)
+                }
+                return
+            }
+
+            // 3) Ни токена, ни sessionId — значит пользователь не авторизован в основной системе
+            setLoading(false)
+            window.location.href = authLoginUrl
+        }
+
         initAuth();
     }, []);
 

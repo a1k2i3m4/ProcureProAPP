@@ -5,7 +5,14 @@ WORKDIR /app
 
 # Vite env variables are injected at build-time
 ARG VITE_API_URL
+ARG VITE_BASE_PATH
+ARG VITE_AUTH_LOGIN_URL
+ARG VITE_AUTH_SERVICE_URL
+
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV VITE_AUTH_LOGIN_URL=${VITE_AUTH_LOGIN_URL}
+ENV VITE_AUTH_SERVICE_URL=${VITE_AUTH_SERVICE_URL}
 
 # Для кеша зависимостей (lock может отсутствовать в некоторых окружениях)
 COPY package*.json ./

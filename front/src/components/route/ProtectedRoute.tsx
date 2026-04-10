@@ -1,5 +1,4 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import LoadingPage from '../../pages/LoadingPage';
 
@@ -15,7 +14,9 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || '/'
+        window.location.href = authLoginUrl
+        return null
     }
 
     return <>{children}</>;
