@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BarChart3, Users, LogOut, User, Settings, Search, Package } from "lucide-react";
+import { Home, BarChart3, Users, LogOut, User, Search, Package } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+
+const basePath = import.meta.env.VITE_BASE_PATH || '/';
 
 const Header: React.FC = () => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -70,10 +72,10 @@ const Header: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {/* Логотип */}
                         <div
-                            className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 shrink-0 cursor-pointer"
+                            className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 shrink-0 cursor-pointer overflow-hidden"
                             onClick={() => handleNavigation("/")}
                         >
-                            <span className="text-white font-bold text-lg">CU</span>
+                            <img src={`${basePath}images/logo.png`} alt="CU" className="h-8 w-8 object-contain" />
                         </div>
 
                         {/* Название системы - скрываем на очень маленьких экранах */}
@@ -171,29 +173,6 @@ const Header: React.FC = () => {
                                     </p>
                                 </div>
 
-                                <button
-                                    onClick={() => {
-                                        handleNavigation("/profile");
-                                        setIsProfileOpen(false);
-                                    }}
-                                    className="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    <User size={16} className="mr-3 text-gray-500" />
-                                    Профиль
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        handleNavigation("/settings");
-                                        setIsProfileOpen(false);
-                                    }}
-                                    className="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    <Settings size={16} className="mr-3 text-gray-500" />
-                                    Настройки
-                                </button>
-
-                                <div className="border-t border-gray-100 my-1"></div>
 
                                 <button
                                     onClick={handleLogout}
