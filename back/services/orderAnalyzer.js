@@ -108,13 +108,19 @@ async function startAnalysis(pool, orderId) {
     }
 
     // Find matching suppliers
-    const suppliers = await findMatchingSuppliers(pool, categoryIds, isUrgent);
+    let suppliers = await findMatchingSuppliers(pool, categoryIds, isUrgent);
+
+    // Fallback: если срочный заказ, но нет поставщиков с can_urgent — берём всех подходящих
+    if (suppliers.length === 0 && isUrgent) {
+      console.log(`⚠️ No urgent-capable suppliers for order ${orderId}, falling back to all suppliers`);
+      suppliers = await findMatchingSuppliers(pool, categoryIds, false);
+    }
 
     if (suppliers.length === 0) {
       await logError(pool, orderId, null, 'supplier_match', `No suppliers found for categories (urgent: ${isUrgent})`);
       // Всегда уведомляем владельца — даже при ошибке
       await whatsappService.sendAdminNotification(order, []);
-      throw new Error(`No suppliers found with WhatsApp numbers for this order${isUrgent ? ' (urgent capable)' : ''}`);
+      throw new Error(`No suppliers found with WhatsApp numbers for this order`);
     }
 
     // Determine timeout based on urgency
