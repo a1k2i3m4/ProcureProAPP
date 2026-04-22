@@ -1,6 +1,7 @@
 import { AuthCredentials, AuthResponse, LoginResponse, RegisterData, User } from "../types/auth.ts";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { authApi } from "../api/authApi.ts";
+import { resolveAuthLoginUrl, resolveAuthServiceUrl } from '../utils/authRedirect';
 
 interface AuthContextType {
     user: User | null;
@@ -27,8 +28,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     useEffect(() => {
         const initAuth = async (): Promise<void> => {
-            const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || '/'
-            const authServiceUrl = ((import.meta as any).env?.VITE_AUTH_SERVICE_URL || '').replace(/\/+$/, '')
+            const authLoginUrl = resolveAuthLoginUrl()
+            const authServiceUrl = resolveAuthServiceUrl()
 
             const params = new URLSearchParams(window.location.search)
             const sessionId = params.get('sessionId')

@@ -2,6 +2,7 @@
 import axios, {AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig} from 'axios'
 import {AuthCredentials, AuthResponse, RegisterData, User} from "../types/auth.ts";
 import { getApiBaseUrl } from './apiBase';
+import { resolveAuthLoginUrl, resolveAuthServiceUrl } from '../utils/authRedirect';
 
 const API_URL = getApiBaseUrl();
 
@@ -73,7 +74,7 @@ const createApiInstance = (): AxiosInstance =>{
                     return instance(originalRequest)
                 }
 
-                const authServiceUrl = ((import.meta as any).env?.VITE_AUTH_SERVICE_URL || '').replace(/\/+$/, '');
+                const authServiceUrl = resolveAuthServiceUrl();
                 if (authServiceUrl) {
                     const response = await axios.post<AuthResponse>(
                         `${authServiceUrl}/api/auth/refresh`,
@@ -101,7 +102,7 @@ const createApiInstance = (): AxiosInstance =>{
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
                 // В ProcurePro нет собственного логина: редиректим в централизованный AuthService
-                const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || '/'
+                const authLoginUrl = resolveAuthLoginUrl();
                 window.location.href = authLoginUrl;
             }
             return Promise.reject(error);

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import LoadingPage from '../../pages/LoadingPage';
+import { resolveAuthLoginUrl } from '../../utils/authRedirect';
 
 interface ProtectedRouteProps {
     children: ReactNode;
@@ -14,7 +15,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     }
 
     if (!isAuthenticated) {
-        const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || '/'
+        const authLoginUrl = resolveAuthLoginUrl();
         window.location.href = authLoginUrl
         return null
     }

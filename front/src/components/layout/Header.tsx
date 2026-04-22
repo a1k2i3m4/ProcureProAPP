@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, BarChart3, Users, LogOut, User, Search, Package } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { resolveAuthLoginUrl } from '../../utils/authRedirect';
 
 const basePath = import.meta.env.VITE_BASE_PATH || '/';
 
@@ -45,7 +46,7 @@ const Header: React.FC = () => {
     const handleLogout = async () => {
         try {
             await logout();
-            const authLoginUrl = (import.meta as any).env?.VITE_AUTH_LOGIN_URL || "/";
+            const authLoginUrl = resolveAuthLoginUrl();
             window.location.href = authLoginUrl;
         } catch (error) {
             console.error("Ошибка при выходе:", error);
