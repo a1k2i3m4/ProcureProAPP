@@ -140,7 +140,7 @@ async function startAnalysis(pool, orderId) {
     const sendMode = String(process.env.WHATSAPP_SEND_MODE || 'template').toLowerCase();
     const templateName = process.env.WHATSAPP_TEMPLATE_NAME || 'tender';
     const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || 'ru';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://82.115.42.79:8083';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://82.115.42.79:8083').replace(/\/+$/, '');
 
     for (const supplier of suppliers) {
       try {

@@ -8,7 +8,7 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_API_TOKEN || 'EAASixjgSKEkBQ9OD61fKZ
 // Backward-compatible: some env files used WHATSAPP_PHONE_NUMBER for phone_number_id
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER || '1007855415740100';
 const MOCK_MODE = process.env.WHATSAPP_MOCK_MODE === 'true';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://82.115.42.79:8083';
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://82.115.42.79:8083').replace(/\/+$/, '');
 
 // Номер владельца — получает уведомление о КАЖДОМ заказе всегда
 const ADMIN_NOTIFY_NUMBER = process.env.ADMIN_NOTIFY_NUMBER || '77072303223';

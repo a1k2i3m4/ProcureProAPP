@@ -38,22 +38,63 @@ const createApiInstance = (): AxiosInstance =>{
         async (error : AxiosError) => {
             const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+            if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
+                return Promise.reject(error);
+            }
+
+            originalRequest._retry = true;
+
             try {
                 const refreshToken = localStorage.getItem('refreshToken');
                 if(refreshToken){
-                    const response = await axios.post<AuthResponse>(`${API_URL}/api/auth/refresh`, {
+                    const response = await axios.post<ApiResponse<AuthResponse>>(`${API_URL}/api/auth/refresh`, {
                         refreshToken,
-                    })
-                    const {token, refreshToken: newRefreshToken} = response.data;
+                    });
+                    const refreshData = response.data?.data;
+                    const token = refreshData?.token;
+                    const newRefreshToken = refreshData?.refreshToken;
+                    const refreshedUser = refreshData?.user;
+
+                    if (!token) {
+                        throw new Error('LOCAL_REFRESH_NO_TOKEN');
+                    }
+
                     localStorage.setItem('token', token);
                     if(newRefreshToken){
                         localStorage.setItem('refreshToken', newRefreshToken);
+                    }
+                    if (refreshedUser) {
+                        localStorage.setItem('user', JSON.stringify(refreshedUser));
                     }
 
                     if(originalRequest.headers) {
                         originalRequest.headers.Authorization = `Bearer ${token}`;
                     }
                     return instance(originalRequest)
+                }
+
+                const authServiceUrl = ((import.meta as any).env?.VITE_AUTH_SERVICE_URL || '').replace(/\/+$/, '');
+                if (authServiceUrl) {
+                    const response = await axios.post<AuthResponse>(
+                        `${authServiceUrl}/api/auth/refresh`,
+                        {},
+                        { withCredentials: true }
+                    );
+
+                    const token = response.data?.token;
+                    if (!token) {
+                        throw new Error('SSO_REFRESH_NO_TOKEN');
+                    }
+
+                    localStorage.setItem('token', token);
+                    if (response.data?.user) {
+                        localStorage.setItem('user', JSON.stringify(response.data.user));
+                    }
+
+                    if (originalRequest.headers) {
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                    }
+                    return instance(originalRequest);
                 }
             }catch(error){
                 localStorage.removeItem('token');

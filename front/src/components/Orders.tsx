@@ -20,6 +20,28 @@ export function Orders() {
     const [newOrderId, setNewOrderId] = useState('');
     const [newOrderFast, setNewOrderFast] = useState<'no' | 'yes'>('no');
     const [newItems, setNewItems] = useState<OrderItem[]>([{ tovar: '', specific: '', qty: 1 }]);
+    const [triggerOptions, setTriggerOptions] = useState<string[]>([]);
+    const [triggerOptionsLoading, setTriggerOptionsLoading] = useState(false);
+
+    const loadTriggerOptions = async () => {
+        try {
+            setTriggerOptionsLoading(true);
+            const categories = await ordersApi.getTriggerOptions();
+            const normalized = Array.from(
+                new Set(
+                    (categories || [])
+                        .map(category => category.name?.trim())
+                        .filter((name): name is string => Boolean(name))
+                )
+            ).sort((a, b) => a.localeCompare(b, 'ru'));
+            setTriggerOptions(normalized);
+        } catch (e) {
+            console.error('Не удалось загрузить список триггеров', e);
+            setTriggerOptions([]);
+        } finally {
+            setTriggerOptionsLoading(false);
+        }
+    };
 
     const openCreateModal = async () => {
         setCreateError(null);
@@ -28,7 +50,10 @@ export function Orders() {
         setNewOrderId('...');
         setCreateModalOpen(true);
         try {
-            const res = await ordersApi.getNextManualId();
+            const [res] = await Promise.all([
+                ordersApi.getNextManualId(),
+                loadTriggerOptions(),
+            ]);
             setNewOrderId(res.next_id);
         } catch {
             setNewOrderId('manual-001');
@@ -379,12 +404,21 @@ export function Orders() {
                             <label className="text-sm font-medium text-gray-700">
                                 Товары <span className="text-red-500">*</span>
                             </label>
-                            <button
-                                onClick={handleAddItem}
-                                className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
-                            >
-                                <Plus className="w-4 h-4" /> Добавить строку
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-gray-500">
+                                    {triggerOptionsLoading
+                                        ? 'Загружаем триггеры...'
+                                        : triggerOptions.length > 0
+                                            ? `Доступных триггеров: ${triggerOptions.length}`
+                                            : 'Нет доступных триггеров с поставщиками — можно ввести свой вручную'}
+                                </span>
+                                <button
+                                    onClick={handleAddItem}
+                                    className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                                >
+                                    <Plus className="w-4 h-4" /> Добавить строку
+                                </button>
+                            </div>
                         </div>
 
                         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -392,7 +426,7 @@ export function Orders() {
                                 <thead className="bg-gray-50 text-gray-500">
                                     <tr>
                                         <th className="px-3 py-2 text-left font-medium">Наименование *</th>
-                                        <th className="px-3 py-2 text-left font-medium">Категория</th>
+                                        <th className="px-3 py-2 text-left font-medium">Триггер</th>
                                         <th className="px-3 py-2 text-center font-medium w-20">Кол-во</th>
                                         <th className="w-8"></th>
                                     </tr>
@@ -410,13 +444,23 @@ export function Orders() {
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.specific}
-                                                    onChange={e => handleItemChange(idx, 'specific', e.target.value)}
-                                                    placeholder="Канцтовары"
-                                                    className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
-                                                />
+                                                <>
+                                                    <input
+                                                        type="text"
+                                                        list="procurepro-trigger-options"
+                                                        value={item.specific}
+                                                        onChange={e => handleItemChange(idx, 'specific', e.target.value)}
+                                                        placeholder={triggerOptions.length > 0 ? 'Выберите или введите свой триггер' : 'Например: Канцтовары'}
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
+                                                    />
+                                                    {idx === 0 && triggerOptions.length > 0 && (
+                                                        <datalist id="procurepro-trigger-options">
+                                                            {triggerOptions.map(option => (
+                                                                <option key={option} value={option} />
+                                                            ))}
+                                                        </datalist>
+                                                    )}
+                                                </>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input

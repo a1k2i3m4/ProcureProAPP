@@ -103,6 +103,13 @@ function mapItemsToCategories(items) {
     const tovar    = String(item.tovar || item.name || '').trim().toLowerCase();
     const itemCats = new Set();
 
+    // Всегда сохраняем исходный trigger/specific как кандидат,
+    // чтобы точные категории из Excel (например, "Расходники хоз.")
+    // не терялись из-за маппинга в более общие группы.
+    if (specific) {
+      itemCats.add(specific);
+    }
+
     // 1. Exact match on specific
     if (specific && CATEGORY_MAPPING[specific]) {
       CATEGORY_MAPPING[specific].forEach(cat => itemCats.add(cat));
@@ -127,10 +134,6 @@ function mapItemsToCategories(items) {
       }
     }
 
-    // 4. Last resort: use specific value itself so DB ILIKE may still find a category
-    if (itemCats.size === 0 && specific) {
-      itemCats.add(specific);
-    }
 
     itemCats.forEach(cat => categoryNames.add(cat));
   }

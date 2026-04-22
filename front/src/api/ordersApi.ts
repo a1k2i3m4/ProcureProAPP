@@ -6,6 +6,11 @@ export interface OrderItem {
     qty: number;
 }
 
+export interface TriggerOption {
+    id: number;
+    name: string;
+}
+
 export interface Order {
     order_id: string;
     fast: 'yes' | 'no';
@@ -114,6 +119,10 @@ export interface AnalysisError {
 export const ordersApi = {
     createOrder: async (data: { order_id: string; fast: 'yes' | 'no'; items: OrderItem[] }) => {
         const response = await publicApi.post('/orders', data);
+        return response.data;
+    },
+    getTriggerOptions: async () => {
+        const response = await publicApi.get<TriggerOption[]>('/categories/available');
         return response.data;
     },
     getNextManualId: async (): Promise<{ next_id: string }> => {

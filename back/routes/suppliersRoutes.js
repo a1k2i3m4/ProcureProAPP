@@ -13,6 +13,29 @@ router.get('/categories', async (_req, res) => {
   }
 });
 
+// GET /api/categories/available
+// Возвращает только те триггеры/категории, по которым есть поставщики с WhatsApp,
+// чтобы пользователь не выбирал заведомо неанализируемые категории в форме заказа.
+router.get('/categories/available', async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.id, c.name
+      FROM categories c
+      WHERE EXISTS (
+        SELECT 1
+        FROM suppliers s
+        WHERE s.category_id = c.id
+          AND s.whatsapp IS NOT NULL
+          AND s.whatsapp <> ''
+      )
+      ORDER BY c.name
+    `);
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ message: 'Ошибка получения доступных триггеров', error: String(e.message || e) });
+  }
+});
+
 // GET /api/suppliers?category=...&q=...
 router.get('/suppliers', async (req, res) => {
   try {

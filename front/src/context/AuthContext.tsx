@@ -87,6 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                     const data: any = await resp.json().catch(() => null)
                     const exchangedToken: string | undefined = data?.token
+                    const exchangedRefreshToken: string | undefined = data?.refreshToken
                     const exchangedUser: any = data?.user || data?.employee || data?.supervisor || null
 
                     if (!exchangedToken) {
@@ -94,6 +95,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
 
                     localStorage.setItem('token', exchangedToken)
+                    if (exchangedRefreshToken) {
+                        localStorage.setItem('refreshToken', exchangedRefreshToken)
+                    }
 
                     if (exchangedUser) {
                         localStorage.setItem('user', JSON.stringify(exchangedUser))

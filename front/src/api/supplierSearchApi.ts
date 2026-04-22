@@ -1,4 +1,4 @@
-import { publicApi } from './apiBase';
+import api from './authApi';
 
 export interface InternetSupplier {
   id?: number;
@@ -29,13 +29,12 @@ export interface SearchSuppliersResponse {
 
 /** Запускает поиск поставщиков в интернете */
 export async function searchSuppliersOnline(
-  data: SearchSuppliersRequest,
-  token: string
+  data: SearchSuppliersRequest
 ): Promise<SearchSuppliersResponse> {
-  const res = await publicApi.post<SearchSuppliersResponse>(
+  const res = await api.post<SearchSuppliersResponse>(
     '/supplier-search',
     data,
-    { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
+    { timeout: 120000 }
   );
   return res.data;
 }
@@ -43,21 +42,17 @@ export async function searchSuppliersOnline(
 /** Получает кэшированные результаты из БД */
 export async function getCachedSuppliers(
   query: string,
-  token: string,
   limit = 50,
   offset = 0
 ): Promise<SearchSuppliersResponse> {
-  const res = await publicApi.get<SearchSuppliersResponse>('/supplier-search', {
+  const res = await api.get<SearchSuppliersResponse>('/supplier-search', {
     params: { query, limit, offset },
-    headers: { Authorization: `Bearer ${token}` },
   });
   return res.data;
 }
 
 /** Удаляет запись из кэша */
-export async function deleteCachedSupplier(id: number, token: string): Promise<void> {
-  await publicApi.delete(`/supplier-search/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function deleteCachedSupplier(id: number): Promise<void> {
+  await api.delete(`/supplier-search/${id}`);
 }
 

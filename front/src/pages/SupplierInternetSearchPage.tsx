@@ -139,8 +139,6 @@ const InternetSupplierCard: React.FC<SupplierCardProps> = ({ supplier, onDelete 
 
 // ─── Главная страница поиска ──────────────────────────────────────────────────
 const SupplierInternetSearchPage: React.FC = () => {
-  const token: string = localStorage.getItem('token') || '';
-
   // Форма
   const [nomenclature, setNomenclature] = useState('');
   const [specs, setSpecs]               = useState('');
@@ -171,8 +169,7 @@ const SupplierInternetSearchPage: React.FC = () => {
 
     try {
       const res = await searchSuppliersOnline(
-        { nomenclature: nomenclature.trim(), specs: specs.trim(), region: region.trim() || undefined, maxResults },
-        token
+        { nomenclature: nomenclature.trim(), specs: specs.trim(), region: region.trim() || undefined, maxResults }
       );
       setSuppliers(res.suppliers);
       setSearched(true);
@@ -188,7 +185,7 @@ const SupplierInternetSearchPage: React.FC = () => {
   const handleCacheSearch = async () => {
     setCacheLoading(true);
     try {
-      const res = await getCachedSuppliers(cacheQuery, token);
+      const res = await getCachedSuppliers(cacheQuery);
       setCacheResults(res.suppliers);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
@@ -200,7 +197,7 @@ const SupplierInternetSearchPage: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteCachedSupplier(id, token);
+      await deleteCachedSupplier(id);
       setCacheResults((prev) => prev.filter((s) => s.id !== id));
     } catch (_) {
       // игнорируем ошибку удаления
