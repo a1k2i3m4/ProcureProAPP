@@ -406,9 +406,14 @@ router.get('/analytics', async (req, res) => {
 });
 
 // GET /api/analytics/:id - Get detailed analysis by ID
-router.get('/analytics/:id', async (req, res) => {
+router.get('/analytics/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    // Let more specific routes (e.g. /analytics/summary) handle non-numeric IDs.
+    if (!/^\d+$/.test(String(id))) {
+      return next();
+    }
 
     // Get analysis overview
     const analysisResult = await pool.query(`

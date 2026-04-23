@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS internet_suppliers (
   updated_at      TIMESTAMP DEFAULT NOW()
 );
 
+-- Backward-compatible columns used by searchAndSave() inserts.
+ALTER TABLE internet_suppliers ADD COLUMN IF NOT EXISTS price NUMERIC(14,2);
+ALTER TABLE internet_suppliers ADD COLUMN IF NOT EXISTS price_currency TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_internet_suppliers_query ON internet_suppliers(query);
 CREATE INDEX IF NOT EXISTS idx_internet_suppliers_website ON internet_suppliers(website);
 
