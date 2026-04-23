@@ -4,11 +4,21 @@ export interface OrderItem {
     tovar: string;
     specific: string;
     qty: number;
+    gs_code?: string;
 }
 
 export interface TriggerOption {
     id: number;
     name: string;
+}
+
+export interface StockOption {
+    id: number;
+    gs_code: string | null;
+    group_name: string | null;
+    name: string;
+    stock_qty: number | null;
+    min_stock: number | null;
 }
 
 export interface Order {
@@ -123,6 +133,10 @@ export const ordersApi = {
     },
     getTriggerOptions: async () => {
         const response = await publicApi.get<TriggerOption[]>('/categories/available');
+        return response.data;
+    },
+    getStocks: async () => {
+        const response = await publicApi.get<StockOption[]>('/stocks');
         return response.data;
     },
     getNextManualId: async (): Promise<{ next_id: string }> => {
