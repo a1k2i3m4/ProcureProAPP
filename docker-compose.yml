@@ -37,6 +37,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: procurepro
+      WMS_WAREHOUSE_CODE: 500005
+      WMS_SYNC_PRUNE: "true"
       ORDERS_DIR: /orders
       # ONEC_API_KEY: procurepro-1c-secret-key
       # Optional extras from host .env
@@ -73,3 +75,9 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  default:
+    name: cu_app-network
+    external: true
+

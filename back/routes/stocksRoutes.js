@@ -3,43 +3,96 @@ const express = require('express');
 const pool = require('../db');
 const multer = require('multer');
 const xlsx = require('xlsx');
+const { syncStocksFromWms, seedStocksFromWms, getWmsSyncStatus } = require('../services/wmsSyncService');
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
-router.get('/stocks', async (_req, res) => {
+
+router.get('/stocks/wms-sync-status', async (_req, res) => {
   try {
-    const q = await pool.query('SELECT id,gs_code,group_name,name,contract_company,min_stock,stock_qty,updated_at FROM stocks ORDER BY group_name,name');
-    res.json(q.rows);
-  } catch (e) { res.status(500).json({ message: String(e.message) }); }
+    const status = await getWmsSyncStatus();
+    res.json({ ok: true, ...status });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: String(e.message || e) });
+  }
+});
+
+router.post('/stocks/wms-sync', async (req, res) => {
+  try {
+    const prune = req.query.prune !== 'false';
+    const result = await syncStocksFromWms({ prune });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: String(e.message || e) });
+  }
+});
+
+router.post('/stocks/seed-from-wms', async (req, res) => {
+  try {
+    const warehouseCode = req.query.warehouseCode || req.body.warehouseCode;
+    console.log('[seed-from-wms] warehouseCode param:', warehouseCode);
+    const result = await seedStocksFromWms(warehouseCode);
+    res.json(result);
+  } catch (e) {
+    console.error('[seed-from-wms] Error:', e.message);
+    res.status(500).json({ ok: false, message: String(e.message || e) });
+  }
+});
+
+router.get('/stocks', async (_req, res) => {
+   try {
+     const q = await pool.query('SELECT id,gs_code,group_name,name,contract_company,min_stock,stock_qty,price,updated_at FROM stocks ORDER BY group_name,name');
+     res.json(q.rows);
+   } catch (e) { res.status(500).json({ message: String(e.message) }); }
 });
 router.post('/stocks', async (req, res) => {
   try {
-    const { gs_code, group_name, name, contract_company, min_stock, stock_qty } = req.body;
+    const { gs_code, group_name, name, contract_company, min_stock, stock_qty, price } = req.body;
     if (!name?.trim()) return res.status(400).json({ message: 'name обязателен' });
     const q = await pool.query(
-      'INSERT INTO stocks(gs_code,group_name,name,contract_company,min_stock,stock_qty) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
+      'INSERT INTO stocks(gs_code,group_name,name,contract_company,min_stock,stock_qty,price) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',
       [gs_code||null, group_name||null, name.trim(), contract_company||null,
-       min_stock!=null?Number(min_stock):null, stock_qty!=null?Number(stock_qty):null]
+       min_stock!=null?Number(min_stock):null, stock_qty!=null?Number(stock_qty):null,
+       price!=null?Number(price):null]
     );
     res.status(201).json(q.rows[0]);
   } catch (e) { res.status(500).json({ message: String(e.message) }); }
 });
 router.put('/stocks/:id', async (req, res) => {
   try {
-    const { stock_qty, min_stock } = req.body;
+    const { stock_qty, min_stock, price } = req.body;
     const q = await pool.query(
-      'UPDATE stocks SET stock_qty=$1,min_stock=$2,updated_at=NOW() WHERE id=$3 RETURNING *',
-      [stock_qty!=null?Number(stock_qty):null, min_stock!=null?Number(min_stock):null, req.params.id]
+      'UPDATE stocks SET stock_qty=$1,min_stock=$2,price=$3,updated_at=NOW() WHERE id=$4 RETURNING *',
+      [stock_qty!=null?Number(stock_qty):null, min_stock!=null?Number(min_stock):null,
+       price!=null?Number(price):null, req.params.id]
     );
     if (!q.rows.length) return res.status(404).json({ message: 'Не найден' });
     res.json(q.rows[0]);
   } catch (e) { res.status(500).json({ message: String(e.message) }); }
 });
+
+router.delete('/stocks/clear', async (req, res) => {
+  try {
+    const confirmDelete = req.query.confirm === 'yes';
+    if (!confirmDelete) {
+      return res.status(400).json({ ok: false, message: 'Требуется параметр ?confirm=yes' });
+    }
+    await pool.query('TRUNCATE TABLE stocks RESTART IDENTITY CASCADE');
+    const count = await pool.query('SELECT COUNT(*) as cnt FROM stocks');
+    console.log('[stocks/clear] Database cleared. Remaining rows:', count.rows[0].cnt);
+    res.json({ ok: true, message: 'Все товары удалены', remaining: count.rows[0].cnt });
+  } catch (e) {
+    console.error('[stocks/clear] Error:', e.message);
+    res.status(500).json({ ok: false, message: String(e.message || e) });
+  }
+});
+
 router.delete('/stocks/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM stocks WHERE id=$1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ message: String(e.message) }); }
 });
+
 router.post('/stocks/import', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });

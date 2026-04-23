@@ -15,6 +15,7 @@ const { parseSuppliersFromCU } = require('./services/excelImport');
 const whatsappService = require('./services/whatsappService');
 const orderAnalyzer = require('./services/orderAnalyzer');
 const { CATEGORY_MAPPING } = require('./services/categoryMapper');
+const { syncStocksFromWms, getWmsSyncStatus, WMS_SYNC_INTERVAL_MS } = require('./services/wmsSyncService');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -133,11 +134,19 @@ async function initDb() {
       contract_company TEXT,
       min_stock        NUMERIC,
       stock_qty        NUMERIC,
+      price            NUMERIC,
       updated_at       TIMESTAMP DEFAULT NOW(),
       CONSTRAINT stocks_name_unique UNIQUE(name)
     );
     CREATE INDEX IF NOT EXISTS idx_stocks_group ON stocks(group_name);
   `);
+
+  // Добавляем поле price если его еще нет (для существующих таблиц)
+  try {
+    await pool.query(`ALTER TABLE stocks ADD COLUMN price NUMERIC`);
+  } catch (e) {
+    // Поле уже существует, ошибка ожидаема
+  }
 }
 
 async function importOnce({ force = false } = {}) {
@@ -468,6 +477,40 @@ function normalizeDigitsPhone(raw) {
   return String(raw || '').replace(/[^\d]/g, '').trim();
 }
 
+let wmsSyncTimer = null;
+
+async function scheduledWmsSync() {
+  console.log('⏰ [wms-sync] Запуск ежедневной синхронизации остатков...');
+  try {
+    const result = await syncStocksFromWms();
+    console.log(`✅ [wms-sync] Готово: обновлено ${result.updated_rows} позиций за ${result.duration_ms}ms`);
+  } catch (e) {
+    console.error('❌ [wms-sync] Ошибка синхронизации:', String(e.message || e));
+  }
+
+  wmsSyncTimer = setTimeout(scheduledWmsSync, WMS_SYNC_INTERVAL_MS);
+}
+
+async function checkAndSyncWmsIfNeeded() {
+  try {
+    const status = await getWmsSyncStatus();
+    const lastSyncAt = status.last_synced_at ? new Date(status.last_synced_at) : null;
+    const isStale = !lastSyncAt || (Date.now() - lastSyncAt.getTime() >= WMS_SYNC_INTERVAL_MS);
+
+    if (isStale) {
+      console.log('⚠️ [wms-sync] Нет свежей синхронизации за 24ч — запускаем сейчас...');
+      await syncStocksFromWms();
+    } else {
+      console.log(`✅ [wms-sync] Последняя синхронизация: ${status.last_synced_at}`);
+    }
+
+    wmsSyncTimer = setTimeout(scheduledWmsSync, WMS_SYNC_INTERVAL_MS);
+  } catch (e) {
+    console.error('❌ [wms-sync] Ошибка проверки статуса:', String(e.message || e));
+    wmsSyncTimer = setTimeout(checkAndSyncWmsIfNeeded, 5 * 60 * 1000);
+  }
+}
+
 async function ensureMappedCategoriesExist() {
   // Ensure categories used by category mapper exist in DB
   try {
@@ -516,6 +559,9 @@ async function ensureMappedCategoriesExist() {
   } catch (e) {
     console.warn('⚠️ importOnce failed:', e.message);
   }
+
+  // Первый запуск через 10 секунд, затем раз в сутки
+  setTimeout(checkAndSyncWmsIfNeeded, 10 * 1000);
 
   startOrdersWatcher();
 })();
