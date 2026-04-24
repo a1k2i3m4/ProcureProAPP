@@ -80,9 +80,12 @@ router.get('/orders', async (_req, res) => {
 });
 
 // GET /api/orders/:id
-router.get('/orders/:id', async (req, res) => {
+router.get('/orders/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
+    if (id === 'today') {
+      return next();
+    }
     const q = await pool.query(`SELECT order_id, fast, items, items_count, source_file, status, created_at, imported_at FROM orders WHERE order_id = $1`, [id]);
     if (!q.rows.length) return res.status(404).json({ message: 'Заказ не найден' });
     res.json(q.rows[0]);
