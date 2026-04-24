@@ -24,8 +24,9 @@ function normalizeUrl(rawUrl: string | undefined, fallback: string): string {
     const currentIsLocal = isLocalHostname(current.hostname);
     const targetIsLocal = isLocalHostname(target.hostname);
 
-    // Protect production deployments from misbuilt localhost auth URLs.
-    if (!currentIsLocal && targetIsLocal) {
+    // If the app is opened in a different environment than the configured auth URL,
+    // prefer the current origin so local builds stay local and prod stays prod.
+    if (currentIsLocal !== targetIsLocal) {
       return origin;
     }
 
