@@ -45,11 +45,8 @@ type SortDir = 'asc' | 'desc';
 const stockStatus = (item: StockItem) => {
     if (item.stock_qty === null) return 'unknown';
     if (item.stock_qty <= 0) return 'out';
-    if (item.min_stock !== null && item.min_stock > 0) {
-        const ratio = item.stock_qty / item.min_stock;
-        if (ratio <= 0.1) return 'critical';
-        if (ratio < 0.3) return 'low';
-    }
+    if (item.stock_qty < 10) return 'critical';
+    if (item.stock_qty < 50) return 'low';
     return 'ok';
 };
 

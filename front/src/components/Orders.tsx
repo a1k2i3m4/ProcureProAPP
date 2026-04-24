@@ -150,11 +150,9 @@ export function Orders() {
         }
 
         const qty = Number(stock.stock_qty);
-        const minStock = stock.min_stock !== null && stock.min_stock !== undefined ? Number(stock.min_stock) : null;
         if (qty <= 0) return { text: `Остаток: ${qty}`, className: 'text-red-600' };
-        if ((minStock !== null && minStock > 0 && qty < minStock) || (minStock === null && qty < 10)) {
-            return { text: `Остаток: ${qty} (мало)`, className: 'text-amber-600' };
-        }
+        if (qty < 10) return { text: `Остаток: ${qty} (критично)`, className: 'text-orange-600' };
+        if (qty < 50) return { text: `Остаток: ${qty} (мало)`, className: 'text-amber-600' };
         return { text: `Остаток: ${qty}`, className: 'text-emerald-600' };
     };
 
