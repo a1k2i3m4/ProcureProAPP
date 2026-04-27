@@ -3,30 +3,26 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Vite env variables are injected at build-time
-ARG VITE_API_URL
-ARG VITE_BASE_PATH
-ARG VITE_AUTH_LOGIN_URL
-ARG VITE_AUTH_SERVICE_URL
-
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_BASE_PATH=${VITE_BASE_PATH}
-ENV VITE_AUTH_LOGIN_URL=${VITE_AUTH_LOGIN_URL}
-ENV VITE_AUTH_SERVICE_URL=${VITE_AUTH_SERVICE_URL}
-
 # Для кеша зависимостей (lock может отсутствовать в некоторых окружениях)
-COPY package*.json ./
+COPY procurepro-app/front/package*.json ./
 
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-COPY . .
-RUN npm run build
+COPY procurepro-app/front/ ./
+COPY .env.shared /tmp/.env.shared
+
+RUN FRONTEND_URL="$(grep '^FRONTEND_URL=' /tmp/.env.shared | cut -d= -f2- | tr -d '\r')" \
+ && export VITE_API_URL="/api-procurepro" \
+ && export VITE_BASE_PATH="/procurepro/" \
+ && export VITE_AUTH_LOGIN_URL="${FRONTEND_URL}" \
+ && export VITE_AUTH_SERVICE_URL="${FRONTEND_URL}" \
+ && npm run build
 
 # runtime stage
 FROM nginx:1.27-alpine
 
 # Nginx config (SPA + /api proxy)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY procurepro-app/front/nginx.conf /etc/nginx/conf.d/default.conf
 
 # static assets
 COPY --from=build /app/dist /usr/share/nginx/html

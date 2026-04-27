@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Package, Clock, FileText, Loader, RefreshCw, BarChart3, Plus, Trash2, AlertCircle } from "lucide-react";
-import { Order, OrderItem, ordersApi } from "../api/ordersApi";
+import { Order, OrderItem, StockOption, ordersApi } from "../api/ordersApi";
 import { Modal } from "./Modal";
 import { AnalysisModal } from "./AnalysisModal";
 
@@ -22,6 +22,9 @@ export function Orders() {
     const [newItems, setNewItems] = useState<OrderItem[]>([{ tovar: '', specific: '', qty: 1 }]);
     const [triggerOptions, setTriggerOptions] = useState<string[]>([]);
     const [triggerOptionsLoading, setTriggerOptionsLoading] = useState(false);
+    const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
+    const [stockOptionsLoading, setStockOptionsLoading] = useState(false);
+    const [activeProductRow, setActiveProductRow] = useState<number | null>(null);
 
     const loadTriggerOptions = async () => {
         try {
@@ -43,16 +46,42 @@ export function Orders() {
         }
     };
 
+    const loadStockOptions = async () => {
+        try {
+            setStockOptionsLoading(true);
+            const stocks = await ordersApi.getStocks();
+            const normalized = Array.from(
+                new Map(
+                    (stocks || [])
+                        .map(stock => ({
+                            ...stock,
+                            name: stock.name?.trim() || '',
+                        }))
+                        .filter(stock => stock.name)
+                        .map(stock => [`${stock.gs_code || ''}::${stock.name.toLowerCase()}`, stock])
+                ).values()
+            ).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+            setStockOptions(normalized);
+        } catch (e) {
+            console.error('Не удалось загрузить остатки для подсказок', e);
+            setStockOptions([]);
+        } finally {
+            setStockOptionsLoading(false);
+        }
+    };
+
     const openCreateModal = async () => {
         setCreateError(null);
         setNewOrderFast('no');
         setNewItems([{ tovar: '', specific: '', qty: 1 }]);
+        setActiveProductRow(null);
         setNewOrderId('...');
         setCreateModalOpen(true);
         try {
             const [res] = await Promise.all([
                 ordersApi.getNextManualId(),
                 loadTriggerOptions(),
+                loadStockOptions(),
             ]);
             setNewOrderId(res.next_id);
         } catch {
@@ -64,6 +93,67 @@ export function Orders() {
     const handleRemoveItem = (idx: number) => setNewItems(prev => prev.filter((_, i) => i !== idx));
     const handleItemChange = (idx: number, field: keyof OrderItem, value: string | number) => {
         setNewItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    };
+
+    const getStockSuggestions = (query: string) => {
+        const q = query.trim().toLowerCase();
+        if (!q) return stockOptions.slice(0, 8);
+
+        const starts: StockOption[] = [];
+        const contains: StockOption[] = [];
+        for (const stock of stockOptions) {
+            const name = (stock.name || '').toLowerCase();
+            const code = (stock.gs_code || '').toLowerCase();
+            const group = (stock.group_name || '').toLowerCase();
+            const searchable = `${name} ${code} ${group}`;
+            if (!searchable.includes(q)) continue;
+            if (name.startsWith(q) || code.startsWith(q)) starts.push(stock);
+            else contains.push(stock);
+        }
+
+        return [...starts, ...contains].slice(0, 8);
+    };
+
+    const handleTovarInputChange = (idx: number, value: string) => {
+        const normalized = value.trim().toLowerCase();
+        const exactMatches = normalized
+            ? stockOptions.filter(stock => stock.name.toLowerCase() === normalized)
+            : [];
+        const matchedCode = exactMatches.length === 1 ? (exactMatches[0].gs_code || undefined) : undefined;
+
+        setNewItems(prev => prev.map((item, i) => {
+            if (i !== idx) return item;
+            return { ...item, tovar: value, gs_code: matchedCode };
+        }));
+    };
+
+    const handleSelectStock = (idx: number, stock: StockOption) => {
+        setNewItems(prev => prev.map((item, i) => {
+            if (i !== idx) return item;
+            return { ...item, tovar: stock.name, gs_code: stock.gs_code || undefined };
+        }));
+        setActiveProductRow(null);
+    };
+
+    const resolveItemStock = (item: OrderItem) => {
+        if (item.gs_code) {
+            const byCode = stockOptions.find(stock => stock.gs_code === item.gs_code);
+            if (byCode) return byCode;
+        }
+        const byName = stockOptions.filter(stock => stock.name.toLowerCase() === item.tovar.trim().toLowerCase());
+        return byName.length === 1 ? byName[0] : null;
+    };
+
+    const getStockIndicator = (stock: StockOption | null) => {
+        if (!stock || stock.stock_qty === null || stock.stock_qty === undefined) {
+            return { text: 'Остаток: —', className: 'text-gray-400' };
+        }
+
+        const qty = Number(stock.stock_qty);
+        if (qty <= 0) return { text: `Остаток: ${qty}`, className: 'text-red-600' };
+        if (qty < 10) return { text: `Остаток: ${qty} (критично)`, className: 'text-orange-600' };
+        if (qty < 50) return { text: `Остаток: ${qty} (мало)`, className: 'text-amber-600' };
+        return { text: `Остаток: ${qty}`, className: 'text-emerald-600' };
     };
 
     const handleCreateOrder = async () => {
@@ -79,6 +169,7 @@ export function Orders() {
             setNewOrderId('');
             setNewOrderFast('no');
             setNewItems([{ tovar: '', specific: '', qty: 1 }]);
+            setActiveProductRow(null);
             await fetchOrders();
         } catch (e: unknown) {
             const err = e as { response?: { data?: { message?: string } }; message?: string };
@@ -406,6 +497,13 @@ export function Orders() {
                             </label>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-gray-500">
+                                    {stockOptionsLoading
+                                        ? 'Загружаем товары из остатков...'
+                                        : stockOptions.length > 0
+                                            ? `Товаров в остатках: ${stockOptions.length}`
+                                            : 'Остатки не загружены — можно ввести название вручную'}
+                                </span>
+                                <span className="text-xs text-gray-500">
                                     {triggerOptionsLoading
                                         ? 'Загружаем триггеры...'
                                         : triggerOptions.length > 0
@@ -421,7 +519,7 @@ export function Orders() {
                             </div>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="border border-gray-200 rounded-lg overflow-visible">
                             <table className="w-full text-sm">
                                 <thead className="bg-gray-50 text-gray-500">
                                     <tr>
@@ -435,13 +533,68 @@ export function Orders() {
                                     {newItems.map((item, idx) => (
                                         <tr key={idx}>
                                             <td className="px-3 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.tovar}
-                                                    onChange={e => handleItemChange(idx, 'tovar', e.target.value)}
-                                                    placeholder="Бумага А4"
-                                                    className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
-                                                />
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        value={item.tovar}
+                                                        onChange={e => handleTovarInputChange(idx, e.target.value)}
+                                                        onFocus={() => setActiveProductRow(idx)}
+                                                        onBlur={() => {
+                                                            setTimeout(() => {
+                                                                setActiveProductRow(prev => (prev === idx ? null : prev));
+                                                            }, 120);
+                                                        }}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Escape') {
+                                                                setActiveProductRow(null);
+                                                            }
+                                                            if (e.key === 'Enter') {
+                                                                const suggestions = getStockSuggestions(item.tovar);
+                                                                if (activeProductRow === idx && suggestions.length > 0) {
+                                                                    e.preventDefault();
+                                                                    handleSelectStock(idx, suggestions[0]);
+                                                                }
+                                                            }
+                                                        }}
+                                                        placeholder="Начните вводить название товара"
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
+                                                    />
+                                                    {activeProductRow === idx && (
+                                                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-auto">
+                                                            {getStockSuggestions(item.tovar).length === 0 ? (
+                                                                <div className="px-3 py-2 text-xs text-gray-400">
+                                                                    Ничего не найдено — можно оставить ручной ввод
+                                                                </div>
+                                                            ) : (
+                                                                getStockSuggestions(item.tovar).map(stock => (
+                                                                    <button
+                                                                        key={`${stock.id}-${stock.gs_code || 'nocode'}`}
+                                                                        type="button"
+                                                                        onMouseDown={e => e.preventDefault()}
+                                                                        onClick={() => handleSelectStock(idx, stock)}
+                                                                        className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                                                    >
+                                                                        <div className="text-sm text-gray-900 truncate">{stock.name}</div>
+                                                                        <div className="text-[11px] text-gray-500 truncate">
+                                                                            {stock.group_name || 'Без группы'}
+                                                                            {stock.gs_code ? ` • GS: ${stock.gs_code}` : ''}
+                                                                            {stock.stock_qty !== null && stock.stock_qty !== undefined ? ` • Остаток: ${stock.stock_qty}` : ''}
+                                                                        </div>
+                                                                    </button>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {(() => {
+                                                        const indicator = getStockIndicator(resolveItemStock(item));
+                                                        return (
+                                                            <div className={`mt-1 text-[11px] ${indicator.className}`}>
+                                                                {indicator.text}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <>

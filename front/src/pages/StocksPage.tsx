@@ -15,7 +15,27 @@ interface StockItem {
     contract_company: string;
     min_stock: number | null;
     stock_qty: number | null;
+    price: number | null;
     updated_at: string;
+}
+
+interface ApiStockItem extends Omit<StockItem, 'min_stock' | 'stock_qty' | 'price'> {
+    min_stock: number | string | null;
+    stock_qty: number | string | null;
+    price: number | string | null;
+}
+
+interface WmsSyncStatus {
+    in_progress: boolean;
+    sync_interval_ms: number;
+    last_synced_at: string | null;
+    last_error: string | null;
+    last_result?: {
+        updated_rows?: number;
+        matched_rows?: number;
+        wms_items?: number;
+        duration_ms?: number;
+    } | null;
 }
 
 type SortField = 'group_name' | 'name' | 'stock_qty' | 'min_stock';
@@ -24,9 +44,9 @@ type SortDir = 'asc' | 'desc';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const stockStatus = (item: StockItem) => {
     if (item.stock_qty === null) return 'unknown';
-    if (item.stock_qty === 0) return 'out';
-    if (item.min_stock && item.stock_qty < item.min_stock * 0.3) return 'critical';
-    if (item.min_stock && item.stock_qty < item.min_stock) return 'low';
+    if (item.stock_qty <= 0) return 'out';
+    if (item.stock_qty < 10) return 'critical';
+    if (item.stock_qty < 50) return 'low';
     return 'ok';
 };
 
@@ -67,7 +87,7 @@ export default function StocksPage() {
 
     // Add modal
     const [addOpen, setAddOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ gs_code: '', group_name: '', name: '', contract_company: '', min_stock: '', stock_qty: '' });
+    const [addForm, setAddForm] = useState({ gs_code: '', group_name: '', name: '', contract_company: '', min_stock: '', stock_qty: '', price: '' });
     const [addError, setAddError] = useState('');
     const [adding, setAdding] = useState(false);
 
@@ -76,12 +96,26 @@ export default function StocksPage() {
     const [uploading, setUploading] = useState(false);
     const [uploadMsg, setUploadMsg] = useState('');
     const [dragOver, setDragOver] = useState(false);
+    const [syncStatus, setSyncStatus] = useState<WmsSyncStatus | null>(null);
+    const [syncStatusLoading, setSyncStatusLoading] = useState(false);
+    const [syncingNow, setSyncingNow] = useState(false);
+
+    const toNumberOrNull = (value: number | string | null | undefined) => {
+        if (value === null || value === undefined || value === '') return null;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+    };
 
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const res = await publicApi.get<StockItem[]>('/stocks');
-            setItems(res.data);
+            const res = await publicApi.get<ApiStockItem[]>('/stocks');
+            setItems(res.data.map((item) => ({
+                ...item,
+                min_stock: toNumberOrNull(item.min_stock),
+                stock_qty: toNumberOrNull(item.stock_qty),
+                price: toNumberOrNull(item.price),
+            })));
         } catch {
             setItems([]);
         } finally {
@@ -89,7 +123,37 @@ export default function StocksPage() {
         }
     };
 
-    useEffect(() => { fetchItems(); }, []);
+    const fetchSyncStatus = async () => {
+        try {
+            setSyncStatusLoading(true);
+            const res = await publicApi.get<{ ok: boolean } & WmsSyncStatus>('/stocks/wms-sync-status');
+            setSyncStatus(res.data);
+        } catch {
+            setSyncStatus(null);
+        } finally {
+            setSyncStatusLoading(false);
+        }
+    };
+
+    const syncFromWms = async () => {
+        try {
+            setSyncingNow(true);
+            setUploadMsg('');
+            await publicApi.post('/stocks/wms-sync');
+            await Promise.all([fetchItems(), fetchSyncStatus()]);
+            setUploadMsg('✅ Остатки обновлены из WMS');
+        } catch {
+            setUploadMsg('❌ Ошибка синхронизации с WMS');
+            await fetchSyncStatus();
+        } finally {
+            setSyncingNow(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchItems();
+        fetchSyncStatus();
+    }, []);
 
     // ── Filtering & Sorting ────────────────────────────────────────────────
     const groups = [...new Set(items.map(i => i.group_name).filter(Boolean))].sort();
@@ -127,7 +191,7 @@ export default function StocksPage() {
     // ── Inline Edit ────────────────────────────────────────────────────────
     const startEdit = (item: StockItem) => {
         setEditingId(item.id);
-        setEditValues({ stock_qty: item.stock_qty, min_stock: item.min_stock });
+        setEditValues({ stock_qty: item.stock_qty, min_stock: item.min_stock, price: item.price });
     };
     const cancelEdit = () => { setEditingId(null); setEditValues({}); };
     const saveEdit = async (item: StockItem) => {
@@ -136,6 +200,7 @@ export default function StocksPage() {
             await publicApi.put(`/stocks/${item.id}`, {
                 stock_qty: editValues.stock_qty !== undefined ? Number(editValues.stock_qty) : item.stock_qty,
                 min_stock: editValues.min_stock !== undefined ? Number(editValues.min_stock) : item.min_stock,
+                price: editValues.price !== undefined ? Number(editValues.price) : item.price,
             });
             await fetchItems();
             setEditingId(null);
@@ -167,9 +232,10 @@ export default function StocksPage() {
                 contract_company: addForm.contract_company,
                 min_stock: addForm.min_stock ? Number(addForm.min_stock) : null,
                 stock_qty: addForm.stock_qty ? Number(addForm.stock_qty) : null,
+                price: addForm.price ? Number(addForm.price) : null,
             });
             setAddOpen(false);
-            setAddForm({ gs_code: '', group_name: '', name: '', contract_company: '', min_stock: '', stock_qty: '' });
+            setAddForm({ gs_code: '', group_name: '', name: '', contract_company: '', min_stock: '', stock_qty: '', price: '' });
             await fetchItems();
         } catch (e: unknown) {
             const err = e as { response?: { data?: { message?: string } } };
@@ -235,6 +301,9 @@ export default function StocksPage() {
     );
 
     const problemsCount = stats.out + stats.critical + stats.low;
+    const lastSyncLabel = syncStatus?.last_synced_at
+        ? new Date(syncStatus.last_synced_at).toLocaleString('ru')
+        : 'еще не выполнялась';
 
     return (
         <div className="space-y-6 px-6 sm:px-10 lg:px-14 xl:px-16 pt-8 pb-12 max-w-[1600px] mx-auto">
@@ -263,6 +332,11 @@ export default function StocksPage() {
                             {uploading ? <Loader className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                             Импорт Excel
                         </button>
+                        <button onClick={syncFromWms} disabled={syncingNow || syncStatus?.in_progress}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 border border-white/20">
+                            {(syncingNow || syncStatus?.in_progress) ? <Loader className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                            Обновить из WMS
+                        </button>
                         <button onClick={handleExport}
                             className="flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white rounded-xl text-sm font-medium transition-all border border-white/20">
                             <Download className="w-4 h-4" /> Экспорт
@@ -289,6 +363,25 @@ export default function StocksPage() {
                     </button>
                 </div>
             )}
+
+            <div className={`px-5 py-3 rounded-xl text-sm border flex items-center gap-2 ${
+                syncStatus?.last_error
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+            }`}>
+                {syncStatus?.last_error ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>
+                    WMS данные: <b>{lastSyncLabel}</b>
+                    {syncStatus?.last_result?.updated_rows != null && `, обновлено ${syncStatus.last_result.updated_rows} поз.`}
+                </span>
+                {syncStatusLoading && <Loader className="w-4 h-4 animate-spin ml-2" />}
+                <button
+                    onClick={fetchSyncStatus}
+                    className="ml-auto px-2 py-1 rounded-md border border-current/20 hover:bg-black/5 transition-all"
+                >
+                    Обновить статус
+                </button>
+            </div>
 
             {/* Drag & Drop zone */}
             <div
@@ -443,6 +536,7 @@ export default function StocksPage() {
                                         onClick={() => toggleSort('stock_qty')}>
                                         <div className="flex items-center justify-end gap-1">Остаток <SortIcon field="stock_qty" /></div>
                                     </th>
+                                    <th className="px-4 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Цена</th>
                                     <th className="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">Заполн.</th>
                                     <th className="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Статус</th>
                                     <th className="px-4 py-3.5 w-20"></th>
@@ -512,6 +606,18 @@ export default function StocksPage() {
                                                     }`}>
                                                         {item.stock_qty?.toLocaleString('ru') ?? '—'}
                                                     </span>
+                                                )}
+                                            </td>
+
+                                            {/* Цена */}
+                                            <td className="px-4 py-3 text-right">
+                                                {isEditing ? (
+                                                    <input type="number" min={0} step={0.01}
+                                                        value={editValues.price ?? ''}
+                                                        onChange={e => setEditValues(v => ({ ...v, price: Number(e.target.value) }))}
+                                                        className="w-24 border border-purple-300 rounded-lg px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+                                                ) : (
+                                                    <span className="text-gray-600 tabular-nums">{item.price ? item.price.toLocaleString('ru') : '—'}</span>
                                                 )}
                                             </td>
 
@@ -670,6 +776,14 @@ export default function StocksPage() {
                                 <input type="number" min={0} placeholder="0"
                                     value={addForm.stock_qty}
                                     onChange={e => setAddForm(prev => ({ ...prev, stock_qty: e.target.value }))}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-gray-50 focus:bg-white transition-all" />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">Закупочная цена</label>
+                                <input type="number" min={0} step={0.01} placeholder="0.00"
+                                    value={addForm.price}
+                                    onChange={e => setAddForm(prev => ({ ...prev, price: e.target.value }))}
                                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-gray-50 focus:bg-white transition-all" />
                             </div>
 
