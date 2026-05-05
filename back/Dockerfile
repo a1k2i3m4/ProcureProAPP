@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Системные зависимости для Chromium (Playwright)
 RUN apk add --no-cache \
+    curl \
     chromium \
     nss \
     freetype \

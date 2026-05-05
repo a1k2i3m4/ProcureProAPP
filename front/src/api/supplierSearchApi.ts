@@ -1,5 +1,14 @@
 import api from './authApi';
 
+const MIN_RESULTS_LIMIT = 1;
+const MAX_RESULTS_LIMIT = 40;
+
+function clampResults(value: number | undefined): number | undefined {
+  if (value == null) return undefined;
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(MAX_RESULTS_LIMIT, Math.max(MIN_RESULTS_LIMIT, Math.round(value)));
+}
+
 export interface InternetSupplier {
   id?: number;
   company_name: string;
@@ -31,9 +40,13 @@ export interface SearchSuppliersResponse {
 export async function searchSuppliersOnline(
   data: SearchSuppliersRequest
 ): Promise<SearchSuppliersResponse> {
+  const payload: SearchSuppliersRequest = {
+    ...data,
+    maxResults: clampResults(data.maxResults),
+  };
   const res = await api.post<SearchSuppliersResponse>(
     '/supplier-search',
-    data,
+    payload,
     { timeout: 120000 }
   );
   return res.data;

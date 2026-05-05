@@ -6,6 +6,15 @@ import {
   InternetSupplier,
 } from '../api/supplierSearchApi';
 
+const MIN_RESULTS_LIMIT = 1;
+const MAX_RESULTS_LIMIT = 40;
+const QUICK_LIMITS = [10, 20, 40];
+
+function clampResults(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(MAX_RESULTS_LIMIT, Math.max(MIN_RESULTS_LIMIT, Math.round(value)));
+}
+
 // ─── Иконки (inline SVG) ──────────────────────────────────────────────────────
 const SearchIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,17 +60,19 @@ interface SupplierCardProps {
 
 const InternetSupplierCard: React.FC<SupplierCardProps> = ({ supplier, onDelete }) => {
   const sourceBadgeColor: Record<string, string> = {
-    google:     'bg-blue-100 text-blue-700',
-    yandex:     'bg-red-100 text-red-700',
-    'satu.kz':  'bg-green-100 text-green-700',
-    'tiu.ru':   'bg-yellow-100 text-yellow-700',
-    'pulscen.ru': 'bg-purple-100 text-purple-700',
-    'kazsnab.kz': 'bg-teal-100 text-teal-700',
+    'google.kz': 'bg-blue-100 text-blue-700',
+    'kaspi.kz': 'bg-red-100 text-red-700',
+    'olx.kz': 'bg-green-100 text-green-700',
+    'satu.kz': 'bg-emerald-100 text-emerald-700',
+    'alibaba.kz': 'bg-orange-100 text-orange-700',
+    'krisha.kz': 'bg-cyan-100 text-cyan-700',
+    'build.kz': 'bg-purple-100 text-purple-700',
   };
   const badgeClass = sourceBadgeColor[supplier.found_via || ''] || 'bg-gray-100 text-gray-700';
+  const contactsCount = supplier.emails.length + supplier.phones.length + supplier.telegrams.length;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md hover:border-purple-200 transition-all">
       {/* Заголовок */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
@@ -112,7 +123,7 @@ const InternetSupplierCard: React.FC<SupplierCardProps> = ({ supplier, onDelete 
       )}
 
       {/* Контакты */}
-      <div className="space-y-1">
+      <div className="space-y-1 pt-2 border-t border-gray-100">
         {supplier.emails.map((email, i) => (
           <a key={i} href={`mailto:${email}`}
             className="flex items-center gap-2 text-sm text-gray-700 hover:text-blue-600">
@@ -132,6 +143,11 @@ const InternetSupplierCard: React.FC<SupplierCardProps> = ({ supplier, onDelete 
             <TelegramIcon /><span>{tg}</span>
           </a>
         ))}
+        {contactsCount === 0 && (
+          <div className="text-xs inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 mt-1">
+            Контакты не найдены
+          </div>
+        )}
       </div>
     </div>
   );
@@ -157,6 +173,12 @@ const SupplierInternetSearchPage: React.FC = () => {
   const [cacheLoading, setCacheLoading] = useState(false);
   const [activeTab, setActiveTab]       = useState<'search' | 'cache'>('search');
 
+  const sourceStats = suppliers.reduce<Record<string, number>>((acc, supplier) => {
+    const key = supplier.found_via || 'прочее';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   // ── Поиск в интернете ──────────────────────────────────────────────────────
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,9 +190,12 @@ const SupplierInternetSearchPage: React.FC = () => {
     setSearched(false);
 
     try {
-      const res = await searchSuppliersOnline(
-        { nomenclature: nomenclature.trim(), specs: specs.trim(), region: region.trim() || undefined, maxResults }
-      );
+      const res = await searchSuppliersOnline({
+        nomenclature: nomenclature.trim(),
+        specs: specs.trim(),
+        region: region.trim() || undefined,
+        maxResults: clampResults(maxResults),
+      });
       setSuppliers(res.suppliers);
       setSearched(true);
     } catch (err: unknown) {
@@ -204,30 +229,33 @@ const SupplierInternetSearchPage: React.FC = () => {
     }  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-white py-8 px-4">
       <div className="max-w-5xl mx-auto">
 
         {/* Заголовок */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <div className="mb-8 bg-white border border-purple-100 rounded-2xl shadow-sm p-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
             <SearchIcon />
             Поиск поставщиков в интернете
           </h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Автоматический поиск через Google, Yandex и B2B-платформы (satu.kz, tiu.ru, pulscen.ru)
+          <p className="text-gray-600 mt-2 text-sm md:text-base">
+            Автоматический поиск по площадкам Казахстана: kaspi.kz, olx.kz, satu.kz, alibaba.kz, krisha.kz, build.kz
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-3 py-1">
+            До {MAX_RESULTS_LIMIT} результатов за 1 запуск
+          </div>
         </div>
 
         {/* Табы */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 bg-white border border-gray-200 rounded-xl p-1 w-fit">
           {(['search', 'cache'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === tab
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
               }`}
             >
               {tab === 'search' ? '🔍 Новый поиск' : '📋 История поиска'}
@@ -239,7 +267,11 @@ const SupplierInternetSearchPage: React.FC = () => {
         {activeTab === 'search' && (
           <>
             {/* Форма */}
-            <form onSubmit={handleSearch} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <form onSubmit={handleSearch} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="mb-4 pb-4 border-b border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900">Параметры поиска</h2>
+                <p className="text-sm text-gray-500 mt-1">Заполните номенклатуру и при необходимости уточните фильтры.</p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,13 +315,43 @@ const SupplierInternetSearchPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Макс. результатов: <strong>{maxResults}</strong>
+                    Макс. результатов: <strong>{maxResults}</strong> / {MAX_RESULTS_LIMIT}
                   </label>
-                  <input
-                    type="range" min={3} max={20} value={maxResults}
-                    onChange={(e) => setMaxResults(Number(e.target.value))}
-                    className="w-full accent-purple-600"
-                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={MIN_RESULTS_LIMIT}
+                      max={MAX_RESULTS_LIMIT}
+                      value={maxResults}
+                      onChange={(e) => setMaxResults(clampResults(Number(e.target.value)))}
+                      className="flex-1 accent-purple-600"
+                    />
+                    <input
+                      type="number"
+                      min={MIN_RESULTS_LIMIT}
+                      max={MAX_RESULTS_LIMIT}
+                      value={maxResults}
+                      onChange={(e) => setMaxResults(clampResults(Number(e.target.value)))}
+                      className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Рекомендуем 8-20 для быстрого ответа.</p>
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {QUICK_LIMITS.map((limit) => (
+                      <button
+                        key={limit}
+                        type="button"
+                        onClick={() => setMaxResults(limit)}
+                        className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
+                          maxResults === limit
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-300 hover:text-purple-700'
+                        }`}
+                      >
+                        {limit}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="md:col-span-2">
@@ -326,7 +388,7 @@ const SupplierInternetSearchPage: React.FC = () => {
               <div className="text-center py-16 text-gray-500">
                 <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"/>
                 <p className="font-medium">Браузер ищет поставщиков...</p>
-                <p className="text-sm mt-1">Проверяем Google, Yandex и B2B-платформы</p>
+                <p className="text-sm mt-1">Проверяем KZ-площадки и сайты поставщиков</p>
               </div>
             )}
 
@@ -340,9 +402,24 @@ const SupplierInternetSearchPage: React.FC = () => {
 
             {!loading && suppliers.length > 0 && (
               <div>
-                <p className="text-sm text-gray-500 mb-3">
-                  Найдено <strong>{suppliers.length}</strong> поставщиков для «{nomenclature}»
-                </p>
+                <div className="flex items-center justify-between mb-3 bg-white border border-gray-200 rounded-xl px-4 py-2">
+                  <p className="text-sm text-gray-600">
+                    Найдено <strong className="text-gray-900">{suppliers.length}</strong> поставщиков для «{nomenclature}»
+                  </p>
+                  <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-1">
+                    Лимит: {maxResults}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {Object.entries(sourceStats).map(([source, count]) => (
+                    <span
+                      key={source}
+                      className="text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded-full px-2.5 py-1"
+                    >
+                      {source}: {count}
+                    </span>
+                  ))}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {suppliers.map((s, i) => (
                     <InternetSupplierCard key={i} supplier={s} />
@@ -356,7 +433,9 @@ const SupplierInternetSearchPage: React.FC = () => {
         {/* ── Таб: История поиска (кэш) ── */}
         {activeTab === 'cache' && (
           <>
-            <div className="flex gap-2 mb-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">История поиска</h2>
+              <div className="flex gap-2 mb-1">
               <input
                 type="text"
                 value={cacheQuery}
@@ -372,6 +451,8 @@ const SupplierInternetSearchPage: React.FC = () => {
               >
                 {cacheLoading ? '...' : 'Показать'}
               </button>
+              </div>
+              <p className="text-xs text-gray-500">Можно фильтровать по номенклатуре или названию компании.</p>
             </div>
 
             {cacheResults.length > 0 && (
@@ -396,6 +477,10 @@ const SupplierInternetSearchPage: React.FC = () => {
 };
 
 export default SupplierInternetSearchPage;
+
+
+
+
 
 
 

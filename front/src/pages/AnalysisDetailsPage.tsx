@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Clock, Package, RefreshCw, Star, CheckCircle, XCircle, Flame, Truck, Send, MessageCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Clock, Package, RefreshCw, Star, CheckCircle, XCircle, Flame, Truck, Send, MessageCircle, Printer } from 'lucide-react';
 import { analyticsApi } from '../api/analyticsApi';
 import { ordersApi, BestOffer, OptimalCombination } from '../api/ordersApi';
 
@@ -92,6 +92,15 @@ const AnalysisDetailsPage: React.FC = () => {
     const num = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(num)) return '0%';
     return `${Math.round(num)}%`;
+  }
+
+  function escapeHtml(value: unknown) {
+    return String(value ?? '—')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   const analysisId = Number(id);
@@ -227,6 +236,141 @@ const AnalysisDetailsPage: React.FC = () => {
     return map;
   }, [analysis?.items]);
 
+  const handlePrintEdoShort = () => {
+    if (!analysis || !data) return;
+
+    const itemRows = (analysis.items || [])
+      .map((it, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${escapeHtml(it.tovar)}</td>
+          <td>${escapeHtml(it.specific || '—')}</td>
+          <td style="text-align:right">${escapeHtml(it.qty)}</td>
+        </tr>
+      `)
+      .join('');
+
+    const responseRows = (data.responses || [])
+      .slice(0, 20)
+      .map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${escapeHtml(r.supplier_name)}</td>
+          <td style="text-align:right">${escapeHtml(formatMoney(r.price))}</td>
+          <td style="text-align:right">${escapeHtml(r.delivery_days)} дн.</td>
+        </tr>
+      `)
+      .join('');
+
+    const html = `
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Краткая форма ЭДО — Заказ ${escapeHtml(analysis.order_id)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; font-size: 12px; }
+    h1 { margin: 0 0 8px 0; font-size: 18px; }
+    h2 { margin: 18px 0 8px 0; font-size: 14px; }
+    .muted { color: #666; margin-bottom: 10px; }
+    .meta div { margin: 2px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; }
+    th { background: #f3f3f3; text-align: left; }
+    .sign { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .line { border-top: 1px solid #111; padding-top: 4px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Краткая печатная форма для ЭДО</h1>
+  <div class="muted">Сформировано: ${escapeHtml(new Date().toLocaleString('ru-RU'))}</div>
+
+  <div class="meta">
+    <div><b>Заказ:</b> ${escapeHtml(analysis.order_id)}</div>
+    <div><b>Анализ ID:</b> ${escapeHtml(analysis.id)}</div>
+    <div><b>Статус:</b> ${escapeHtml(analysis.status)}</div>
+    <div><b>Начат:</b> ${escapeHtml(new Date(analysis.started_at).toLocaleString('ru-RU'))}</div>
+    <div><b>Завершён:</b> ${escapeHtml(analysis.completed_at ? new Date(analysis.completed_at).toLocaleString('ru-RU') : '—')}</div>
+  </div>
+
+  <h2>Позиции заказа</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px">№</th>
+        <th>Товар</th>
+        <th>Категория</th>
+        <th style="width:80px; text-align:right">Кол-во</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows || '<tr><td colspan="4">Нет данных</td></tr>'}
+    </tbody>
+  </table>
+
+  <h2>Ответы поставщиков (кратко)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px">№</th>
+        <th>Поставщик</th>
+        <th style="width:120px; text-align:right">Цена</th>
+        <th style="width:100px; text-align:right">Срок</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${responseRows || '<tr><td colspan="4">Ответов нет</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="sign">
+    <div class="line">Ответственный (ФИО, подпись)</div>
+    <div class="line">Согласовано (ФИО, подпись)</div>
+  </div>
+</body>
+</html>
+    `;
+
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.setAttribute('aria-hidden', 'true');
+
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc || !iframe.contentWindow) {
+        iframe.remove();
+        setError('Не удалось открыть печатную форму. Проверьте настройки браузера.');
+        return;
+      }
+
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const cleanup = () => {
+        iframe.contentWindow?.removeEventListener('afterprint', cleanup);
+        iframe.remove();
+      };
+
+      iframe.contentWindow.addEventListener('afterprint', cleanup);
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(cleanup, 2000);
+      }, 350);
+    } catch {
+      setError('Не удалось открыть печатную форму. Проверьте настройки печати в браузере.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -293,10 +437,20 @@ const AnalysisDetailsPage: React.FC = () => {
             <p className="text-gray-600 mt-1">Анализ #{analysis.id}</p>
           </div>
 
-          <button onClick={load} className="flex items-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg self-start">
-            <RefreshCw className="w-5 h-5" />
-            Обновить
-          </button>
+          <div className="flex flex-wrap gap-2 self-start">
+            <button
+              onClick={handlePrintEdoShort}
+              className="flex items-center gap-2 px-4 py-3 bg-white text-gray-800 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Printer className="w-5 h-5" />
+              Краткая форма ЭДО
+            </button>
+
+            <button onClick={load} className="flex items-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg">
+              <RefreshCw className="w-5 h-5" />
+              Обновить
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

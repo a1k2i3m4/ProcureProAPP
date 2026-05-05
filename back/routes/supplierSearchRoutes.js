@@ -15,7 +15,7 @@ const router = express.Router();
  *   nomenclature  {string}  — обязательно, название товара
  *   specs         {string}  — необязательно, ГОСТ / спецификация
  *   region        {string}  — необязательно, регион
- *   maxResults    {number}  — необязательно, макс. кол-во (1-20, по умолч. 10)
+ *   maxResults    {number}  — необязательно, макс. кол-во (1-40, по умолч. 10)
  *
  * Response:
  *   { ok: true, count: N, suppliers: [...] }
@@ -27,7 +27,7 @@ router.post('/supplier-search', authMiddleware, async (req, res) => {
     return res.status(400).json({ ok: false, message: 'nomenclature обязателен' });
   }
 
-  const max = Math.min(Math.max(parseInt(maxResults) || 10, 1), 20);
+  const max = Math.min(Math.max(parseInt(maxResults) || 10, 1), 40);
 
   try {
     const suppliers = await searchAndSave(pool, String(nomenclature).trim(), {

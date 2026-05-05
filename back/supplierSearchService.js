@@ -39,10 +39,12 @@ function findChromiumPath() {
 
 // ─── B2B платформы ────────────────────────────────────────────────────────────
 const B2B_PLATFORMS = [
+  { name: 'kaspi.kz',   url: 'https://kaspi.kz/shop/search/?text={query}' },
+  { name: 'olx.kz',     url: 'https://www.olx.kz/list/q-{query}/' },
   { name: 'satu.kz',    url: 'https://satu.kz/search?search_term={query}' },
-  { name: 'tiu.ru',     url: 'https://tiu.ru/search?search_term={query}' },
-  { name: 'pulscen.ru', url: 'https://pulscen.ru/find?q={query}' },
-  { name: 'kazsnab.kz', url: 'https://kazsnab.kz/search/?q={query}' },
+  { name: 'alibaba.kz', url: 'https://alibaba.kz/search?query={query}' },
+  { name: 'krisha.kz',  url: 'https://krisha.kz/prodazha/kommercheskaya-nedvizhimost/?das[who]=1&text={query}' },
+  { name: 'build.kz',   url: 'https://build.kz/search/?q={query}' },
 ];
 
 const DEFAULT_MAX_RESULTS = 10;
@@ -154,24 +156,16 @@ class SupplierSearchEngine {
 
     const queries = buildQueries(nomenclature, specs, region);
 
-    // Google + Yandex
+    // Google (KZ-only)
     for (const query of queries) {
       if (suppliers.length >= maxResults) break;
 
-      const [googleResults, yandexResults] = await Promise.allSettled([
-        this._searchGoogle(query),
-        this._searchYandex(query),
-      ]);
+      const googleResults = await this._searchGoogle(`${query} site:.kz`);
 
-      const all = [
-        ...(googleResults.status === 'fulfilled' ? googleResults.value : []),
-        ...(yandexResults.status === 'fulfilled' ? yandexResults.value : []),
-      ];
-
-      for (const result of all) {
+      for (const result of googleResults) {
         if (suppliers.length >= maxResults) break;
         const domain = extractDomain(result.url || '');
-        if (!domain || seenDomains.has(domain)) continue;
+        if (!domain || !domain.endsWith('.kz') || seenDomains.has(domain)) continue;
         seenDomains.add(domain);
 
         const supplier = await this._extractSupplierInfo(result);
@@ -228,41 +222,6 @@ class SupplierSearchEngine {
       }
     } catch (e) {
       logger.warn('[SupplierSearch] Google error: %s', e.message);
-    } finally {
-      if (page) await page.close().catch(() => {});
-    }
-    return results;
-  }
-
-  // ── Поиск Yandex ─────────────────────────────────────────────────────────
-
-  async _searchYandex(query) {
-    const results = [];
-    let page;
-    try {
-      page = await this._context.newPage();
-      const url = `https://yandex.ru/search/?text=${encodeURIComponent(query)}`;
-      await page.goto(url, { timeout: PAGE_TIMEOUT, waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(WAIT_AFTER_LOAD);
-
-      const items = await page.$$('li.serp-item');
-      for (const el of items.slice(0, 10)) {
-        let linkEl = await el.$('a.OrganicTitle-Link');
-        if (!linkEl) linkEl = await el.$('a[href]');
-        const titleEl   = await el.$('h2');
-        const snippetEl = await el.$('div.OrganicTextContentSpan, span.organic__text');
-
-        if (!linkEl) continue;
-        const href    = (await linkEl.getAttribute('href')) || '';
-        const title   = titleEl   ? (await titleEl.innerText())   : '';
-        const snippet = snippetEl ? (await snippetEl.innerText()) : '';
-
-        if (href.startsWith('http') && !href.includes('yandex')) {
-          results.push({ url: href, title, snippet, source: 'yandex' });
-        }
-      }
-    } catch (e) {
-      logger.warn('[SupplierSearch] Yandex error: %s', e.message);
     } finally {
       if (page) await page.close().catch(() => {});
     }
@@ -428,7 +387,4 @@ async function searchAndSave(pool, nomenclature, opts = {}) {
 }
 
 module.exports = { SupplierSearchEngine, searchAndSave, buildQueries };
-
-
-
 
