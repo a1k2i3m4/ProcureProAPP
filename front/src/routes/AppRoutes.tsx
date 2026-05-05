@@ -14,6 +14,7 @@ const SupplierFormPage = lazy(() => import("../pages/SupplierFormPage"));
 const AnalysisDetailsPage = lazy(() => import("../pages/AnalysisDetailsPage"));
 const SupplierInternetSearchPage = lazy(() => import("../pages/SupplierInternetSearchPage"));
 const StocksPage = lazy(() => import("../pages/StocksPage"));
+const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 
 /**
  * 🔀 AppRoutes - Основная маршрутизация приложения
@@ -93,6 +94,17 @@ const AppRoutes: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <StocksPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ProfilePage />
                 </Layout>
               </ProtectedRoute>
             }

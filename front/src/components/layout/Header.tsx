@@ -41,6 +41,7 @@ const Header: React.FC = () => {
     const handleNavigation = (path: string) => {
         navigate(path);
         window.scrollTo(0, 0);
+        setIsProfileOpen(false);
     };
 
     const handleLogout = async () => {
@@ -176,8 +177,16 @@ const Header: React.FC = () => {
 
 
                                 <button
+                                    onClick={() => handleNavigation('/profile')}
+                                    className="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <User size={16} className="mr-3" />
+                                    Профиль
+                                </button>
+
+                                <button
                                     onClick={handleLogout}
-                                    className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                    className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
                                 >
                                     <LogOut size={16} className="mr-3" />
                                     Выйти
