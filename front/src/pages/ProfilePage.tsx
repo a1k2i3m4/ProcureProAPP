@@ -8,6 +8,7 @@ const APP_META: Record<string, { icon: string; name: string; desc: string }> = {
     supervisors: { icon: '📋', name: 'Супервайзеры', desc: 'Проверки и аналитика' },
     heads: { icon: '👔', name: 'Руководители', desc: 'Управление отделами' },
     commercial: { icon: '💼', name: 'Коммерческий', desc: 'Коммерческий отдел' },
+    prorab: { icon: '🏗️', name: 'Прораб App', desc: 'Стройконтроль и Открытие ТТ' },
     floorplan: { icon: '🏬', name: 'FloorPlan', desc: 'Планы магазинов' },
     heatpoint: { icon: '🗺️', name: 'HeatPoint', desc: 'Аналитика локаций' },
     warehouse: { icon: '🏭', name: 'Склад', desc: 'Логистика РЦ' },
