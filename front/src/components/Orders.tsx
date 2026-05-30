@@ -25,6 +25,7 @@ export function Orders() {
     const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
     const [stockOptionsLoading, setStockOptionsLoading] = useState(false);
     const [activeProductRow, setActiveProductRow] = useState<number | null>(null);
+    const [activeTriggerRow, setActiveTriggerRow] = useState<number | null>(null);
 
     const loadTriggerOptions = async () => {
         try {
@@ -75,6 +76,7 @@ export function Orders() {
         setNewOrderFast('no');
         setNewItems([{ tovar: '', specific: '', qty: 1 }]);
         setActiveProductRow(null);
+        setActiveTriggerRow(null);
         setNewOrderId('...');
         setCreateModalOpen(true);
         try {
@@ -112,6 +114,22 @@ export function Orders() {
         }
 
         return [...starts, ...contains].slice(0, 8);
+    };
+
+    const getTriggerSuggestions = (query: string) => {
+        const q = query.trim().toLowerCase();
+        if (!q) return triggerOptions;
+
+        const starts: string[] = [];
+        const contains: string[] = [];
+        for (const option of triggerOptions) {
+            const normalizedOption = option.toLowerCase();
+            if (!normalizedOption.includes(q)) continue;
+            if (normalizedOption.startsWith(q)) starts.push(option);
+            else contains.push(option);
+        }
+
+        return [...starts, ...contains];
     };
 
     const handleTovarInputChange = (idx: number, value: string) => {
@@ -170,6 +188,7 @@ export function Orders() {
             setNewOrderFast('no');
             setNewItems([{ tovar: '', specific: '', qty: 1 }]);
             setActiveProductRow(null);
+            setActiveTriggerRow(null);
             await fetchOrders();
         } catch (e: unknown) {
             const err = e as { response?: { data?: { message?: string } }; message?: string };
@@ -459,7 +478,10 @@ export function Orders() {
             {/* Модалка создания заказа вручную */}
             <Modal
                 isOpen={createModalOpen}
-                onClose={() => setCreateModalOpen(false)}
+                onClose={() => {
+                    setCreateModalOpen(false);
+                    setActiveTriggerRow(null);
+                }}
                 title="Новый заказ вручную"
             >
                 <div className="space-y-5">
@@ -538,7 +560,10 @@ export function Orders() {
                                                         type="text"
                                                         value={item.tovar}
                                                         onChange={e => handleTovarInputChange(idx, e.target.value)}
-                                                        onFocus={() => setActiveProductRow(idx)}
+                                                        onFocus={() => {
+                                                            setActiveProductRow(idx);
+                                                            setActiveTriggerRow(null);
+                                                        }}
                                                         onBlur={() => {
                                                             setTimeout(() => {
                                                                 setActiveProductRow(prev => (prev === idx ? null : prev));
@@ -597,23 +622,65 @@ export function Orders() {
                                                 </div>
                                             </td>
                                             <td className="px-3 py-2">
-                                                <>
+                                                <div className="relative">
                                                     <input
                                                         type="text"
-                                                        list="procurepro-trigger-options"
                                                         value={item.specific}
-                                                        onChange={e => handleItemChange(idx, 'specific', e.target.value)}
+                                                        onChange={e => {
+                                                            handleItemChange(idx, 'specific', e.target.value);
+                                                            setActiveTriggerRow(idx);
+                                                        }}
+                                                        onFocus={() => {
+                                                            setActiveTriggerRow(idx);
+                                                            setActiveProductRow(null);
+                                                        }}
+                                                        onClick={() => setActiveTriggerRow(idx)}
+                                                        onBlur={() => {
+                                                            setTimeout(() => {
+                                                                setActiveTriggerRow(prev => (prev === idx ? null : prev));
+                                                            }, 120);
+                                                        }}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Escape') {
+                                                                setActiveTriggerRow(null);
+                                                            }
+                                                            if (e.key === 'Enter') {
+                                                                const suggestions = getTriggerSuggestions(item.specific);
+                                                                if (activeTriggerRow === idx && suggestions.length > 0) {
+                                                                    e.preventDefault();
+                                                                    handleItemChange(idx, 'specific', suggestions[0]);
+                                                                    setActiveTriggerRow(null);
+                                                                }
+                                                            }
+                                                        }}
                                                         placeholder={triggerOptions.length > 0 ? 'Выберите или введите свой триггер' : 'Например: Канцтовары'}
                                                         className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
                                                     />
-                                                    {idx === 0 && triggerOptions.length > 0 && (
-                                                        <datalist id="procurepro-trigger-options">
-                                                            {triggerOptions.map(option => (
-                                                                <option key={option} value={option} />
-                                                            ))}
-                                                        </datalist>
+                                                    {activeTriggerRow === idx && triggerOptions.length > 0 && (
+                                                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-auto">
+                                                            {getTriggerSuggestions(item.specific).length === 0 ? (
+                                                                <div className="px-3 py-2 text-xs text-gray-400">
+                                                                    Ничего не найдено — можно ввести свой вариант
+                                                                </div>
+                                                            ) : (
+                                                                getTriggerSuggestions(item.specific).map(option => (
+                                                                    <button
+                                                                        key={option}
+                                                                        type="button"
+                                                                        onMouseDown={e => e.preventDefault()}
+                                                                        onClick={() => {
+                                                                            handleItemChange(idx, 'specific', option);
+                                                                            setActiveTriggerRow(null);
+                                                                        }}
+                                                                        className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                                                    >
+                                                                        <div className="text-sm text-gray-900 truncate">{option}</div>
+                                                                    </button>
+                                                                ))
+                                                            )}
+                                                        </div>
                                                     )}
-                                                </>
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input
@@ -652,7 +719,10 @@ export function Orders() {
                     {/* Кнопки */}
                     <div className="flex gap-3 pt-2">
                         <button
-                            onClick={() => setCreateModalOpen(false)}
+                            onClick={() => {
+                                setCreateModalOpen(false);
+                                setActiveTriggerRow(null);
+                            }}
                             className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
                             Отмена
